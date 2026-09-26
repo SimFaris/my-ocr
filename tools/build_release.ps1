@@ -124,9 +124,27 @@ $startHere = @(
 $zip = Join-Path $OutDir ("$name.zip")
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 Write-Host '正在压缩 ...' -ForegroundColor Cyan
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory(
-    $stage, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $true)
+
+# 优先用 tar.exe（Windows 10 起自带）：它生成规范 zip，条目分隔符是正斜杠，
+# 在 macOS/Linux 上解压也能得到正确目录结构。.NET 的 ZipFile 在 Windows 上会写反斜杠，
+# 那种包在 Windows 上没事，但换到别的系统解压会把路径压成一个文件名。
+$tar = Get-Command tar.exe -ErrorAction SilentlyContinue
+$packed = $false
+if ($tar) {
+    Push-Location $OutDir
+    try {
+        & tar.exe -a -c -f "$name.zip" $name
+        $packed = ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $zip))
+    } finally {
+        Pop-Location
+    }
+}
+if (-not $packed) {
+    Write-Host 'tar 不可用，回退到 .NET 压缩（Windows 上使用不受影响）' -ForegroundColor Yellow
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $stage, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $true)
+}
 
 $sizeMb = [math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 1)
 $fileCount = (Get-ChildItem -LiteralPath $stage -Recurse -File | Measure-Object).Count
