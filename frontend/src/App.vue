@@ -18,6 +18,7 @@ async function onLogout() {
       <div class="brand">局域网离线 OCR</div>
       <nav class="nav">
         <router-link to="/workbench">工作台</router-link>
+        <router-link to="/camera">拍照</router-link>
         <router-link to="/jobs">任务列表</router-link>
         <router-link to="/status">系统状态</router-link>
       </nav>

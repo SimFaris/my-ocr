@@ -3,6 +3,7 @@ import Login from './views/Login.vue'
 import Workbench from './views/Workbench.vue'
 import Jobs from './views/Jobs.vue'
 import JobDetail from './views/JobDetail.vue'
+import Camera from './views/Camera.vue'
 import Dashboard from './views/Dashboard.vue'
 import store from './store'
 
@@ -12,6 +13,7 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/workbench' },
     { path: '/workbench', name: 'workbench', component: Workbench, meta: { requiresAuth: true } },
+    { path: '/camera', name: 'camera', component: Camera, meta: { requiresAuth: true } },
     { path: '/jobs', name: 'jobs', component: Jobs, meta: { requiresAuth: true } },
     { path: '/jobs/:id', name: 'job-detail', component: JobDetail, meta: { requiresAuth: true } },
     { path: '/status', name: 'status', component: Dashboard, meta: { requiresAuth: true } },
