@@ -71,11 +71,8 @@ npm install
 npm run build
 cd ..
 
-# 3) 生成自签证书（首次）
-.\.venv\Scripts\python.exe tools\gen_cert.py
-
-# 4) 启动（同时监听 http 8080 与 https 8443）
-.\.venv\Scripts\python.exe run.py
+# 3) 启动（双击 start_server.bat 亦可，它会自动生成证书）
+.\start_server.bat
 ```
 
 首次启动会自动创建管理员账号，并把随机初始密码写入
@@ -85,6 +82,24 @@ cd ..
 并先导入根证书：访问 `https://<服务器IP>:8443/api/system/root-cert` 下载，或在客户端
 以管理员身份运行 `tools\import_root_cert.bat`。
 
+## 启动脚本
+
+根目录的 `start_server.bat` 是日常启动入口，双击即可：
+
+1. 自检：Python 版本、数据目录是否可写、自签证书是否已生成、Umi-OCR 路径、
+   前端产物是否已构建、http/https 端口是否被占用（由 `tools/check_env.py` 完成）。
+   出现阻塞项（端口占用、目录不可写）会直接停下并给出提示。
+2. 首次运行时自动生成自签证书。
+3. 启动服务并打印日志；按 `Ctrl+C` 停止。
+
+也可以带参数运行，例如只监听 http 并换端口：
+
+```
+start_server.bat --no-https --http-port 8088
+```
+
+> 说明：`.bat` 文件用 **GBK(936)** 编码保存，这样中文在不切换代码页的中文 Windows
+> 控制台里能正常显示。编辑这些文件时请保持 GBK 编码与 CRLF 换行。
 ## 常用命令
 
 ```powershell

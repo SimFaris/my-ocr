@@ -404,14 +404,16 @@ def write_binary(path, data):
 
 
 def _force_utf8_output():
-    """输出被重定向到文件或管道时改用 UTF-8，避免中文乱码。"""
+    """保留平台控制台编码，只把无法编码的字符替换掉。
+
+    与批处理脚本的输出编码保持一致，重定向到同一个文件时不会出现两种编码混排。
+    """
     for stream in (sys.stdout, sys.stderr):
         try:
-            if stream is not None and not stream.isatty():
-                stream.reconfigure(encoding='utf-8', errors='replace')
+            if stream is not None:
+                stream.reconfigure(errors='replace')
         except (AttributeError, ValueError, OSError):
             pass
-
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='生成自签根证书与服务器证书')

@@ -10,19 +10,23 @@ _FORMAT = '%(asctime)s %(levelname)-7s [%(name)s] %(message)s'
 _DATEFMT = '%Y-%m-%d %H:%M:%S'
 
 
-def _ensure_utf8_console():
-    """输出被重定向到文件时改用 UTF-8，避免中文日志乱码。"""
+def _ensure_console_safe():
+    """让控制台输出不会因为编码问题报错。
+
+    保留平台编码（中文 Windows 为 GBK），这样控制台/重定向文件里的中文
+    与批处理脚本的输出编码一致；只把无法编码的字符替换掉，避免日志抛异常。
+    """
     for stream in (sys.stdout, sys.stderr):
         try:
-            if stream is not None and not stream.isatty():
-                stream.reconfigure(encoding='utf-8', errors='replace')
+            if stream is not None:
+                stream.reconfigure(errors='replace')
         except (AttributeError, ValueError, OSError):
             pass
 
 
 def setup_logging(log_dir, level='INFO', name='app'):
     """配置根日志器，返回根日志器。可重复调用（会先清空已有 handler）。"""
-    _ensure_utf8_console()
+    _ensure_console_safe()
     directory = Path(log_dir)
     directory.mkdir(parents=True, exist_ok=True)
 

@@ -508,11 +508,12 @@ my-ocr/
 │  ├─ gen_cert.ps1           证书生成
 │  ├─ import_root_cert.bat   客户端导入根证书
 │  ├─ build_offline_bundle.ps1  离线依赖包
-│  ├─ run_server.bat         启动脚本
+│  ├─ check_env.py           启动前自检（端口占用、数据目录、引擎路径）
 │  └─ register_service.ps1   开机自启（计划任务）
 ├─ docs/
 │  ├─ deploy-win7.md  deploy-win10.md  user-guide.md  cert-guide.md
 │  └─ superpowers/specs/2026-09-26-lan-offline-ocr-design.md
+├─ start_server.bat          一键启动脚本（双击运行）
 ├─ data/                     运行时生成（不入库）
 └─ vendor/                   Umi-OCR 与离线依赖包（不入库）
 ```
@@ -541,7 +542,7 @@ Win7 SP1 x64 前置条件：安装 SP1 与 Universal C Runtime（KB2999226），
 
 1. 复制发布包到服务机（含 `vendor/umi-ocr`、离线 wheels、后端代码、已构建的前端）。
 2. 运行 `tools/build_offline_bundle.ps1`（联网机器上执行一次）生成依赖包；离线机用 `pip install --no-index` 安装。
-3. 首次运行 `tools/run_server.bat`：创建数据目录、生成证书与会话密钥、创建管理员、启动 Umi-OCR、监听端口。
+3. 首次运行根目录下的 `start_server.bat`：创建数据目录、生成证书与会话密钥、创建管理员、启动 Umi-OCR、监听端口。
 4. 运行防火墙放行脚本，放行 http/https 端口。
 5. 用 `tools/register_service.ps1` 注册开机自启（计划任务，隐藏窗口；Win10 亦可）。
 6. 各客户端访问 `http://server:8080`；需要拍照的客户端按 `cert-guide.md` 导入根证书后改用 `https://server:8443`（或直接一步到位用 https）。
