@@ -148,3 +148,31 @@ label.checkbox input { margin: 0; }
 
 /* M5：管理与检索 */
 .result { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; font-size: 12px; overflow: auto; }
+
+/* ---- 表格里的操作按钮：彼此分开，不再挤成一团 ---- */
+.actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.btn-mini {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-mini:hover { background: #eff6ff; border-color: #93c5fd; }
+.btn-mini:disabled { opacity: 0.5; cursor: default; }
+.btn-mini.warn { color: #92400e; border-color: #fde68a; }
+.btn-mini.warn:hover { background: #fffbeb; border-color: #fcd34d; }
+.btn-mini.danger { color: #b91c1c; border-color: #fecaca; }
+.btn-mini.danger:hover { background: #fef2f2; border-color: #fca5a5; }

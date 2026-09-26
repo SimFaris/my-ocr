@@ -135,7 +135,7 @@ function go(delta) {
             <th>进度</th>
             <th>创建时间</th>
             <th v-if="showAll">来源</th>
-            <th style="width: 220px">操作</th>
+            <th style="width: 260px">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -156,22 +156,29 @@ function go(delta) {
               <span v-if="job.client_host">（{{ job.client_host }}）</span>
             </td>
             <td>
-              <button class="link" type="button" @click="open(job)">查看</button>
-              <button
-                v-if="['draft', 'queued', 'running'].indexOf(job.status) >= 0"
-                class="link"
-                type="button"
-                :disabled="busyId === job.id"
-                @click="act(job, 'cancel')"
-              >取消</button>
-              <button
-                v-if="['failed', 'partial', 'canceled'].indexOf(job.status) >= 0"
-                class="link"
-                type="button"
-                :disabled="busyId === job.id"
-                @click="act(job, 'retry')"
-              >重试失败项</button>
-              <button class="link" type="button" :disabled="busyId === job.id" @click="act(job, 'delete')">删除</button>
+              <div class="actions-inline">
+                <button class="btn-mini" type="button" @click="open(job)">查看</button>
+                <button
+                  v-if="['draft', 'queued', 'running'].indexOf(job.status) >= 0"
+                  class="btn-mini warn"
+                  type="button"
+                  :disabled="busyId === job.id"
+                  @click="act(job, 'cancel')"
+                >取消</button>
+                <button
+                  v-if="['failed', 'partial', 'canceled'].indexOf(job.status) >= 0"
+                  class="btn-mini"
+                  type="button"
+                  :disabled="busyId === job.id"
+                  @click="act(job, 'retry')"
+                >重试失败项</button>
+                <button
+                  class="btn-mini danger"
+                  type="button"
+                  :disabled="busyId === job.id"
+                  @click="act(job, 'delete')"
+                >删除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!jobs.length">

@@ -107,7 +107,7 @@ function runCleanup() {
 
       <table class="table">
         <thead>
-          <tr><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th>最近登录</th><th style="width: 240px">操作</th></tr>
+          <tr><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th>最近登录</th><th style="width: 300px">操作</th></tr>
         </thead>
         <tbody>
           <tr v-for="user in users" :key="user.id">
@@ -125,20 +125,27 @@ function runCleanup() {
             </td>
             <td class="hint">{{ user.last_login_at || '从未登录' }}</td>
             <td>
-              <button class="link" type="button" :disabled="busy" @click="changeRole(user)">
-                {{ user.role === 'admin' ? '降为普通用户' : '设为管理员' }}
-              </button>
-              <button class="link" type="button" :disabled="busy" @click="toggleActive(user)">
-                {{ user.is_active ? '停用' : '启用' }}
-              </button>
-              <button
-                v-if="me && user.id !== me.id"
-                class="link"
-                type="button"
-                :disabled="busy"
-                @click="resetPassword(user)"
-              >重置密码</button>
-              <router-link v-else class="link" to="/account">改自己的密码</router-link>
+              <div class="actions-inline">
+                <button class="btn-mini" type="button" :disabled="busy" @click="changeRole(user)">
+                  {{ user.role === 'admin' ? '降为普通用户' : '设为管理员' }}
+                </button>
+                <button
+                  class="btn-mini warn"
+                  type="button"
+                  :disabled="busy"
+                  @click="toggleActive(user)"
+                >
+                  {{ user.is_active ? '停用' : '启用' }}
+                </button>
+                <button
+                  v-if="me && user.id !== me.id"
+                  class="btn-mini"
+                  type="button"
+                  :disabled="busy"
+                  @click="resetPassword(user)"
+                >重置密码</button>
+                <router-link v-else class="btn-mini" to="/account">改自己的密码</router-link>
+              </div>
             </td>
           </tr>
         </tbody>
