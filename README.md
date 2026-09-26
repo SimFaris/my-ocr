@@ -27,7 +27,7 @@
 | M2 | 批量导入图片：多选/拖拽/文件夹、任务队列与轮转调度、进度、结果查看与编辑、导出 txt/csv | 已完成 |
 | M3 | 批量导入 PDF：页级进度、双层可搜索 PDF 与文本产出、导出 | 已完成 |
 | M4 | 摄像头拍照：设备选择、连拍、裁剪旋转、证书导入引导 | 已完成 |
-| M5 | 用户管理、参数设置、历史检索、清理策略、Excel 导出、部署脚本与离线依赖包 | 待开发 |
+| M5 | 用户管理、参数设置、历史检索、清理策略、Excel 导出、部署脚本与离线依赖包 | 已完成 |
 
 ## Umi-OCR 的放置与切换引擎
 
@@ -100,6 +100,20 @@ start_server.bat --no-https --http-port 8088
 
 > 说明：`.bat` 文件用 **GBK(936)** 编码保存，这样中文在不切换代码页的中文 Windows
 > 控制台里能正常显示。编辑这些文件时请保持 GBK 编码与 CRLF 换行。
+## 部署到目标机
+
+- [Windows 7 部署](docs/deploy-win7.md)（含免安装运行时与官方 Python 两种方式、部署后自检清单）
+- [Windows 10/11 部署](docs/deploy-win10.md)
+- [根证书导入说明](docs/cert-guide.md)（客户端拍照前必做一次）
+- [使用手册](docs/user-guide.md)
+
+打包命令：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_runtime38.ps1     # 免安装运行时（推荐）
+powershell -ExecutionPolicy Bypass -File tools\build_offline_bundle.ps1  # 离线依赖包（配合官方 Python）
+```
+
 ## 使用流程
 
 1. **工作台**：选择图片（支持多选、拖拽、整个文件夹），可选识别语言与排版方案，
@@ -131,10 +145,10 @@ start_server.bat --no-https --http-port 8088
 | --- | --- |
 | `backend/` | 服务端：配置、数据库、认证、接口、Umi 集成、任务调度 |
 | `frontend/` | Vue 3 + Vite 前端，构建产物由后端托管 |
-| `tools/` | 证书生成、启动脚本、客户端根证书导入脚本 |
+| `tools/` | 证书生成、启动脚本、离线打包、开机自启、防火墙、客户端根证书导入 |
 | `tests/` | pytest 测试，含可控故障的假 Umi 服务（`tests/fake_umi.py`） |
 | `data/` | 运行时数据：数据库、上传文件、识别结果、证书、日志（不入库） |
-| `docs/` | 设计文档与部署文档 |
+| `docs/` | 设计文档、部署文档（Win7/Win10）、证书导入说明、使用手册 |
 
 ## 部署到 Windows 7 的注意事项
 

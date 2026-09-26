@@ -8,15 +8,18 @@ import time
 from flask import Blueprint, send_file
 
 from .. import __version__
-from ..security import login_required
+from ..repositories import audit
+from ..security import admin_required, current_user, login_required
 from ..umi import UmiError
 from ..utils import disk_usage, now_iso
 from ..repositories import jobs as jobs_repo
-from .common import context, fail, ok
+from .common import client_ip, context, fail, ok
 
 log = logging.getLogger(__name__)
 
 bp = Blueprint('system', __name__, url_prefix='/api/system')
+# 运维类接口用独立蓝图，路径不带前缀（对外是 /api/maintenance/...）
+maintenance_bp = Blueprint('maintenance', __name__)
 
 CACHE_SECONDS = 300
 _options_cache = {}
@@ -34,6 +37,7 @@ def status():
     queue_payload = jobs_repo.queue_summary(ctx['db'])
     runtime = ctx.get('queue')
     queue_payload['runtime'] = runtime.snapshot() if runtime is not None else None
+    keeper = ctx.get('retention')
     return ok({
         'app_version': __version__,
         'server_time': now_iso(),
@@ -42,6 +46,7 @@ def status():
         'workers': config['ocr_workers'],
         'disk': disk_usage(config.data_dir),
         'data_dir': str(config.data_dir),
+        'retention': keeper.snapshot() if keeper is not None else None,
         'https': {
             'enabled': bool(config['enable_https']),
             'port': config['https_port'],
@@ -89,6 +94,22 @@ def ocr_options():
 def doc_options():
     """文档（PDF）识别参数定义。"""
     return _cached_options('doc')
+
+
+@maintenance_bp.post('/api/maintenance/cleanup')
+@admin_required
+def maintenance_cleanup():
+    """立即执行一次保留策略清理（管理员手动触发）。"""
+    ctx = context()
+    keeper = ctx.get('retention')
+    if keeper is None:
+        return fail('internal', '清理组件未启用', 500)
+    result = keeper.run_once()
+    if result is None:
+        return fail('internal', '清理执行失败，请查看服务端日志', 500)
+    audit.write(ctx['db'], 'maintenance_cleanup', user_id=current_user()['id'],
+                detail=result, ip=client_ip())
+    return ok({'result': result})
 
 
 @bp.get('/root-cert')

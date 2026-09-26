@@ -9,6 +9,14 @@ from ..utils import now_iso
 
 log = logging.getLogger(__name__)
 
+class ExportError(Exception):
+    """导出失败。"""
+
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
+
+
 STATUS_LABELS = {
     'pending': '待提交',
     'queued': '排队中',
@@ -57,6 +65,44 @@ def export_txt(data_dir, job, items, path):
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text('\n'.join(lines), encoding='utf-8')
+    return target
+
+
+def export_xlsx(data_dir, job, items, path):
+    """导出 Excel；openpyxl 是纯 Python 依赖，目标机不需要装 Office。"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font
+    except ImportError:
+        raise ExportError('服务端缺少 openpyxl，无法导出 Excel；可改用 csv，'
+                          '或执行 pip install -r requirements.txt')
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = '识别结果'
+    sheet.append(['序号', '文件名', '状态', '字符数', '耗时(秒)', '识别文本'])
+    for item in items:
+        sheet.append([
+            item['seq'],
+            item['original_name'],
+            status_label(item['status']),
+            item['char_count'] or 0,
+            round((item['duration_ms'] or 0) / 1000.0, 2),
+            read_text(data_dir, item),
+        ])
+
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    sheet.freeze_panes = 'A2'
+    sheet.column_dimensions['B'].width = 32
+    sheet.column_dimensions['F'].width = 60
+    for row in sheet.iter_rows(min_row=2, min_col=6, max_col=6):
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True, vertical='top')
+
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(str(target))
     return target
 
 

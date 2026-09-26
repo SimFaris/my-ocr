@@ -2,7 +2,6 @@
 """任务接口：创建、上传、提交、查询、取消、重试、删除与导出。"""
 
 import logging
-import shutil
 import zipfile
 from pathlib import Path
 
@@ -12,7 +11,8 @@ from ..repositories import audit
 from ..repositories import items as items_repo
 from ..repositories import jobs as jobs_repo
 from ..security import current_user, login_required
-from ..services.export import export_csv, export_txt
+from ..services.export import ExportError, export_csv, export_txt, export_xlsx
+from ..services.storage import remove_job_files
 from ..services.ingest import (IMAGE_EXTENSIONS, PDF_EXTENSIONS, IngestError,
                                accept_upload)
 from ..utils import disk_usage
@@ -28,7 +28,7 @@ SOURCE_TYPES = ('image', 'pdf', 'camera', 'mixed')
 ENABLED_SOURCE_TYPES = ('image', 'pdf', 'camera')
 # 每种来源允许的文件类型（以文件头判定为准）
 SOURCE_KINDS = {'image': ('image',), 'camera': ('image',), 'pdf': ('pdf',)}
-EXPORT_FORMATS = ('txt', 'csv', 'pdflayered')   # 与入参统一为小写，接口仍接受 pdfLayered
+EXPORT_FORMATS = ('txt', 'csv', 'xlsx', 'pdflayered')   # 与入参统一为小写，接口仍接受 pdfLayered
 _ILLEGAL_FILENAME_CHARS = set('\\/:*?"<>|')
 
 
@@ -47,16 +47,6 @@ def _safe_stem(text, fallback='export'):
     cleaned = cleaned.strip().strip('.')
     return cleaned[:60] or fallback
 
-
-def _remove_job_files(config, job_id):
-    """删除任务占用的目录；失败只记日志。"""
-    for name in ('uploads', 'results', 'exports'):
-        target = Path(config.data_dir) / name / job_id
-        if target.is_dir():
-            try:
-                shutil.rmtree(str(target))
-            except OSError as exc:
-                log.warning('删除目录 %s 失败：%s', target, exc)
 
 
 @bp.post('/jobs')
@@ -271,7 +261,7 @@ def delete_job(job_id):
     if job['status'] in ('queued', 'running'):
         items_repo.skip_unfinished(ctx['db'], job_id)
         jobs_repo.set_status(ctx['db'], job_id, 'canceled')
-    _remove_job_files(ctx['config'], job_id)
+    remove_job_files(ctx['config'].data_dir, job_id)
     jobs_repo.delete(ctx['db'], job_id)
     audit.write(ctx['db'], 'job_deleted', user_id=current_user()['id'], target=job_id,
                 detail={'title': job['title']}, ip=client_ip())
@@ -345,6 +335,13 @@ def export_job(job_id):
     if fmt == 'txt':
         path = export_txt(ctx['config'].data_dir, job, rows, target)
         mimetype = 'text/plain; charset=utf-8'
+    elif fmt == 'xlsx':
+        try:
+            path = export_xlsx(ctx['config'].data_dir, job, rows, target)
+        except ExportError as exc:
+            return fail('internal', exc.message, 500)
+        mimetype = ('application/vnd.openxmlformats-officedocument'
+                    '.spreadsheetml.sheet')
     else:
         path = export_csv(ctx['config'].data_dir, rows, target)
         mimetype = 'text/csv; charset=utf-8'

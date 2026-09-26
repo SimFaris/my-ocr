@@ -184,6 +184,18 @@ def test_export_txt_and_csv(api_client, admin):
 
     assert api.get('/api/jobs/%s/export?format=pdf' % job_id).status_code == 400
 
+    xlsx = api.get('/api/jobs/%s/export?format=xlsx' % job_id)
+    assert xlsx.status_code == 200
+    assert xlsx.headers['Content-Type'].startswith('application/vnd.openxmlformats')
+
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(io.BytesIO(xlsx.data))
+    sheet = workbook.active
+    assert [cell.value for cell in sheet[1]][:3] == ['序号', '文件名', '状态']
+    assert sheet['B2'].value == '甲.png'
+    assert sheet.cell(row=2, column=6).value == '第一行\n第二行'
+
 
 def test_write_requires_csrf(client, admin):
     response = client.post('/api/auth/login', json=admin)

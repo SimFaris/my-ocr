@@ -186,6 +186,7 @@ function downloadItemText(item) {
         >重试失败项（{{ failedCount }}）</button>
         <a class="btn ghost" :href="exportUrl('txt', 'all')">导出全部 txt</a>
         <a class="btn ghost" :href="exportUrl('csv', 'all')">导出全部 csv</a>
+        <a class="btn ghost" :href="exportUrl('xlsx', 'all')">导出 Excel</a>
         <a class="btn ghost" :href="exportUrl('txt', 'success')">仅导出成功项 txt</a>
         <a
           v-if="hasLayered"

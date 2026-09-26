@@ -134,6 +134,17 @@ class Config(object):
     def cert_path(self, name='server.crt'):
         return self.cert_dir / name
 
+    def set_runtime(self, key, value):
+        """运行时覆盖配置项。
+
+        来源优先级为：环境变量 > config.json > 内置默认值；这里是管理员在界面上
+        改的设置，只覆盖本次运行的取值并单独持久化到数据库，不动 config.json。
+        """
+        if key not in DEFAULTS:
+            raise ValueError('未知配置项：%s' % key)
+        self._values[key] = value
+        return value
+
     def ensure_dirs(self):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         for name in ('uploads', 'results', 'exports', 'certs', 'logs', 'tmp'):

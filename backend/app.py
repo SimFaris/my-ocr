@@ -16,13 +16,18 @@ from . import security
 from .api import auth as auth_api
 from .api import items as items_api
 from .api import jobs as jobs_api
+from .api import search as search_api
+from .api import settings as settings_api
 from .api import system as system_api
+from .api import users as users_api
 from .config import load_config
 from .db import Database
 from .logging_setup import setup_logging
 from .queue.manager import OcrQueue
 from .repositories import jobs as jobs_repo
 from .repositories import users as users_repo
+from .services import runtime_settings
+from .services.retention import RetentionRunner
 from .umi.manager import UmiManager
 
 log = logging.getLogger(__name__)
@@ -103,6 +108,7 @@ def create_app(config=None, base_dir=None):
 
     db = Database(config.db_path)
     db.init_schema()
+    runtime_settings.load_runtime(db, config)
     recovered = jobs_repo.recover_running(db)
     if recovered:
         log.warning('启动恢复：%d 个中断的任务项已重新排队', recovered)
@@ -128,9 +134,11 @@ def create_app(config=None, base_dir=None):
         'umi': umi,
         'limiter': security.LoginRateLimiter(),
         'queue': None,
+        'retention': None,
     }
-    # 队列对象需要引用上下文本身，所以先建字典再补进去
+    # 这两个组件都需要引用上下文本身，所以先建字典再补进去
     context['queue'] = OcrQueue(context)
+    context['retention'] = RetentionRunner(context)
     app.extensions['ocr'] = context
 
     @app.before_request
@@ -179,6 +187,10 @@ def create_app(config=None, base_dir=None):
     app.register_blueprint(system_api.bp)
     app.register_blueprint(jobs_api.bp)
     app.register_blueprint(items_api.bp)
+    app.register_blueprint(users_api.bp)
+    app.register_blueprint(settings_api.bp)
+    app.register_blueprint(search_api.bp)
+    app.register_blueprint(system_api.maintenance_bp)
 
     dist_dir = Path(config['frontend_dist_dir'])
 
@@ -188,11 +200,18 @@ def create_app(config=None, base_dir=None):
             return send_from_directory(str(dist_dir), 'index.html')
         return _placeholder_page()
 
+    @app.route('/api/<path:rest>', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+    def _api_not_found(rest):
+        """未知接口统一返回 JSON 404。
+
+        没有这条规则时，未注册的 /api 路径会落到下面的前端兜底路由，只能返回 405，
+        让人以为是方法用错了。
+        """
+        return jsonify({'ok': False, 'error': {
+            'code': 'not_found', 'message': '接口不存在'}}), 404
+
     @app.get('/<path:filename>')
     def _frontend(filename):
-        if filename.startswith('api/'):
-            return jsonify({'ok': False, 'error': {
-                'code': 'not_found', 'message': '接口不存在'}}), 404
         target = dist_dir / filename
         if target.is_file():
             return send_from_directory(str(dist_dir), filename)

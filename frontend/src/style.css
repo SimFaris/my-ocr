@@ -145,3 +145,6 @@ label.checkbox input { margin: 0; }
 .crop-image { max-width: 100%; display: block; border: 1px solid #e5e7eb; border-radius: 6px; }
 .crop-box { position: absolute; border: 2px dashed #2563eb; background: rgba(37, 99, 235, 0.12); pointer-events: none; }
 .steps { margin: 8px 0 0 18px; line-height: 2; }
+
+/* M5：管理与检索 */
+.result { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; font-size: 12px; overflow: auto; }

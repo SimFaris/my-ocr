@@ -47,6 +47,11 @@ def set_active(db, user_id, active):
                      (1 if active else 0, user_id))
 
 
+def set_display_name(db, user_id, display_name):
+    with db.transaction() as conn:
+        conn.execute('UPDATE users SET display_name = ? WHERE id = ?', (display_name, user_id))
+
+
 def set_role(db, user_id, role):
     with db.transaction() as conn:
         conn.execute('UPDATE users SET role = ? WHERE id = ?', (role, user_id))

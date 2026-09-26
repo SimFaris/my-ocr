@@ -111,6 +111,7 @@ def main(argv=None):
     context = app.extensions['ocr']
     context['umi'].start_monitor()
     context['queue'].start()
+    context['retention'].start()
 
     try:
         for scheme, server in servers:
@@ -127,6 +128,7 @@ def main(argv=None):
                 server.stop()
             except Exception:
                 log.exception('停止监听失败')
+        context['retention'].stop()
         context['queue'].stop()
         context['umi'].stop()
         log.info('已停止')

@@ -4,7 +4,8 @@ rem  局域网离线 OCR 系统 —— 启动后端服务
 rem
 rem  用法：
 rem    直接双击本文件即可启动
-rem    也可带参数运行：start_server.bat --no-https --http-port 8088
+rem    带参数运行：start_server.bat --no-https --http-port 8088
+rem    计划任务静默启动：start_server.bat --no-pause
 rem
 rem  停止服务：在本窗口按 Ctrl+C
 rem ==========================================================
@@ -12,15 +13,27 @@ setlocal enabledelayedexpansion
 title 局域网离线 OCR 服务
 cd /d "%~dp0"
 
+set "NOPAUSE="
+if /i "%~1"=="--no-pause" (
+  set "NOPAUSE=1"
+  shift
+)
+
+rem 依次尝试：项目自带虚拟环境 -> 免安装运行时 -> 系统 PATH 中的 python
 set "PY=%~dp0.venv\Scripts\python.exe"
+if not exist "%PY%" set "PY=%~dp0vendor\runtime38\python.exe"
+if not exist "%PY%" set "PY=python"
 
 echo.
 echo === 局域网离线 OCR 系统 ===
 echo.
+echo 使用的 Python：%PY%
 
-if not exist "%PY%" goto no_venv
 if not exist "%~dp0run.py" goto no_runpy
+"%PY%" -c "import flask" 2>nul
+if errorlevel 1 goto no_deps
 
+echo.
 echo [1/3] 运行环境自检
 echo.
 "%PY%" "%~dp0tools\check_env.py"
@@ -55,12 +68,15 @@ echo 服务已退出，返回码 %EXITCODE%
 if not "%EXITCODE%"=="0" echo 请查看 data\logs 目录下的日志排查原因。
 goto end
 
-:no_venv
-echo [错误] 未找到虚拟环境：%PY%
+:no_deps
+echo [错误] 当前 Python 环境缺少依赖（未找到 flask）。
 echo.
-echo 请先在项目根目录执行下面两条命令：
-echo     python -m venv .venv
-echo     .venv\Scripts\python.exe -m pip install -r requirements.txt
+echo 请任选一种方式准备运行环境：
+echo    方式A（推荐，免安装）：把打包好的 vendor\runtime38 目录放到项目根目录
+echo    方式B（虚拟环境）：
+echo        python -m venv .venv
+echo        .venv\Scripts\python.exe -m pip install -r requirements.txt
+echo    离线机请用 tools\build_offline_bundle.ps1 生成的离线包安装
 set "EXITCODE=1"
 goto end
 
@@ -70,6 +86,8 @@ set "EXITCODE=1"
 goto end
 
 :end
-echo.
-pause
+if not defined NOPAUSE (
+  echo.
+  pause
+)
 exit /b %EXITCODE%

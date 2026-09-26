@@ -20,6 +20,8 @@ async function onLogout() {
         <router-link to="/workbench">工作台</router-link>
         <router-link to="/camera">拍照</router-link>
         <router-link to="/jobs">任务列表</router-link>
+        <router-link to="/search">检索</router-link>
+        <router-link v-if="user && user.role === 'admin'" to="/admin">管理</router-link>
         <router-link to="/status">系统状态</router-link>
       </nav>
       <div class="spacer"></div>

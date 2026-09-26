@@ -29,6 +29,8 @@ class OcrQueue(object):
     def start(self):
         if any(worker.is_alive() for worker in self.workers):
             return False
+        # 每次启动都按当前配置取线程数，这样运行时改 ocr_workers 也能生效
+        self.worker_count = max(1, int(self.context['config']['ocr_workers']))
         self.stop_event.clear()
         self.workers = []
         for index in range(self.worker_count):
@@ -51,4 +53,7 @@ class OcrQueue(object):
 
     def snapshot(self):
         alive = len([worker for worker in self.workers if worker.is_alive()])
-        return {'workers': self.worker_count, 'alive': alive, 'running': bool(alive)}
+        # 线程数按当前配置读，这样运行时改 ocr_workers 后界面立刻反映新值
+        configured = max(1, int(self.context['config']['ocr_workers']))
+        self.worker_count = configured
+        return {'workers': configured, 'alive': alive, 'running': bool(alive)}
