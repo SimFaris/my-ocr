@@ -13,6 +13,15 @@ import sys
 import threading
 import time
 
+# 把项目根目录加入模块搜索路径。
+#
+# 嵌入式 Python（部署用的免安装运行时）以"隔离模式"启动：sys.path 完全由 ._pth
+# 文件决定，不会自动包含脚本所在目录，于是 import backend 会失败。普通虚拟环境
+# 下这行是无害的补充。
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from cheroot import wsgi
 from cheroot.ssl.builtin import BuiltinSSLAdapter
 
