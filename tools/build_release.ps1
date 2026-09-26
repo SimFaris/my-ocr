@@ -121,7 +121,7 @@ $startHere = @(
     '',
     '数据、证书、日志都在 data\ 目录下，备份就是复制它。'
 ) -join "`r`n"
-[System.IO.File]::WriteAllText((Join-Path $stage '从这里开始.txt'), $startHere, (New-Object System.Text.UTF8Encoding $true))
+[System.IO.File]::WriteAllText((Join-Path $stage 'START-HERE.txt'), $startHere, (New-Object System.Text.UTF8Encoding $true))
 
 $zip = Join-Path $OutDir ("$name.zip")
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
