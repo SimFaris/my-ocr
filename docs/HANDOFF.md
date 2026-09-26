@@ -10,7 +10,7 @@
 用户在任意系统的浏览器里访问，支持批量图片、批量 PDF、调用本机 USB 摄像头拍照三种输入，
 识别能力复用开源软件 Umi-OCR。
 
-- 仓库位置：`E:\CODE\my-ocr`
+- 仓库位置：本项目目录（下称 `<项目目录>`）
 - 设计文档：`docs/superpowers/specs/2026-09-26-lan-offline-ocr-design.md`（架构、选型、数据模型、接口清单）
 - 安装使用：`docs/install-and-usage.md`
 - 部署细节：`docs/deploy-win7.md`、`docs/deploy-win10.md`
@@ -44,7 +44,7 @@ M5 之后还补了几处（都是实际使用中暴露的）：
 ## 三、最短启动路径
 
 ```powershell
-cd E:\CODE\my-ocr
+cd <项目目录>
 .\.venv\Scripts\python.exe run.py        # 开发机
 # 或者双击 start_server.bat（会自动选自带的运行时并生成证书）
 ```
