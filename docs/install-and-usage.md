@@ -177,6 +177,9 @@ PDF 若勾选「生成双层可搜索 PDF」，识别完成后可下载带文字
 | 摄像头提示被占用 | 关掉系统相机应用、会议软件等占用摄像头的程序 |
 | 忘记管理员密码 | `vendor\runtime38\python.exe tools\reset_admin.py --username admin` |
 | Win7 报缺少 api-ms-win-crt-*.dll | 安装 Universal C Runtime（KB2999226） |
+| 解压后没有 data 目录，能启动吗？ | 能。`data`（数据库、证书、管理员初始密码文件、日志）在**首次启动时自动生成**，不需要预先存在 |
+| 解压后没有 .venv，能启动吗？ | 能。发布包自带 `vendor\runtime38`（Python 3.8.10 + 全部依赖），启动脚本会优先用它；只有用"官方 Python"方式部署时才需要 `.venv` |
+| 提示"以下端口已被占用" | 已有实例在跑。注意：若用 `--http-port` 指定了别的端口，自检也会按该端口判断 |
 
 ## 9. 已验证与未验证
 

@@ -19,6 +19,18 @@ if /i "%~1"=="--no-pause" (
   shift
 )
 
+rem 自己拼一份参数串给 Python 用。
+rem 关键：批处理的 %* 不受 shift 影响，仍会包含 --no-pause，
+rem 传给 Python 会让 argparse 报 unknown arguments 直接退出；
+rem 所以这里逐项收集（shift 后的 %1..%9）。
+set "ARGS="
+:collect
+if "%~1"=="" goto collected
+set "ARGS=%ARGS% "%~1""
+shift
+goto collect
+:collected
+
 rem 依次尝试：项目自带虚拟环境 -> 免安装运行时 -> 系统 PATH 中的 python
 set "PY=%~dp0.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=%~dp0vendor\runtime38\python.exe"
@@ -28,6 +40,7 @@ echo.
 echo === 局域网离线 OCR 系统 ===
 echo.
 echo 使用的 Python：%PY%
+if defined ARGS echo 启动参数：%ARGS%
 
 if not exist "%~dp0run.py" goto no_runpy
 "%PY%" -c "import flask" 2>nul
@@ -36,7 +49,7 @@ if errorlevel 1 goto no_deps
 echo.
 echo [1/3] 运行环境自检
 echo.
-"%PY%" "%~dp0tools\check_env.py"
+"%PY%" "%~dp0tools\check_env.py" %ARGS%
 if errorlevel 1 (
   echo.
   echo 自检发现阻塞项，未启动服务，请按上面的提示处理后重试。
@@ -61,7 +74,7 @@ echo.
 echo [3/3] 启动服务，按 Ctrl+C 可停止
 echo        提示：首次运行如弹出防火墙提示，请选择允许访问。
 echo.
-"%PY%" "%~dp0run.py" %*
+"%PY%" "%~dp0run.py" %ARGS%
 set "EXITCODE=%ERRORLEVEL%"
 echo.
 echo 服务已退出，返回码 %EXITCODE%

@@ -6,6 +6,7 @@
 返回码：0 表示可以启动；1 表示存在硬性阻塞（数据目录不可写或端口被占用）。
 """
 
+import argparse
 import socket
 import sys
 from pathlib import Path
@@ -58,9 +59,35 @@ def writable(path):
         return False
 
 
-def main():
+def build_parser():
+    parser = argparse.ArgumentParser(description='启动前环境自检')
+    parser.add_argument('--base-dir', help='项目根目录，默认自动探测')
+    parser.add_argument('--config', help='config.json 路径')
+    parser.add_argument('--host', help='监听地址')
+    parser.add_argument('--http-port', type=int, help='http 端口')
+    parser.add_argument('--https-port', type=int, help='https 端口')
+    parser.add_argument('--no-https', action='store_true', help='不启用 https')
+    return parser
+
+
+def main(argv=None):
     force_utf8_output()
-    config = load_config(base_dir=PROJECT_ROOT)
+    args = build_parser().parse_args(argv)
+
+    # 必须与 run.py 用同一套覆盖规则：否则启动脚本传了 --http-port，
+    # 自检却还去检查 config.json 里的旧端口，会误报"端口被占用"而不让启动。
+    overrides = {}
+    if args.host:
+        overrides['host'] = args.host
+    if args.http_port is not None:
+        overrides['http_port'] = args.http_port
+    if args.https_port is not None:
+        overrides['https_port'] = args.https_port
+    if args.no_https:
+        overrides['enable_https'] = False
+
+    config = load_config(base_dir=args.base_dir, config_path=args.config,
+                         overrides=overrides or None)
     blocked = False
 
     print('Python 版本    : %s' % sys.version.split()[0])
