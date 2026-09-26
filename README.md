@@ -29,6 +29,35 @@
 | M4 | 摄像头拍照：设备选择、连拍、裁剪旋转、证书导入引导 | 待开发 |
 | M5 | 用户管理、参数设置、历史检索、清理策略、Excel 导出、部署脚本与离线依赖包 | 待开发 |
 
+## Umi-OCR 的放置与切换引擎
+
+服务机上的目录结构（`vendor/` 不入库）：
+
+```
+vendor/umi-ocr/
+  Umi-OCR_Rapid_v2.1.5.7z.exe          官方原始安装包（留档，便于拷到离线机）
+  Umi-OCR_Paddle_v2.1.5.7z.exe         官方原始安装包
+  Umi-OCR_Rapid_v2.1.5/Umi-OCR.exe     解压后的 Rapid 版（默认使用，兼容性优先）
+  Umi-OCR_Paddle_v2.1.5/Umi-OCR.exe    解压后的 Paddle 版（速度稍快，备用）
+```
+
+本机用 `config.json` 指定实际使用的那一个（该文件不入库，模板见 `config.example.json`）：
+
+```json
+{ "umi_exe_path": "vendor/umi-ocr/Umi-OCR_Rapid_v2.1.5/Umi-OCR.exe" }
+```
+
+切换引擎：把 `umi_exe_path` 改成 `vendor/umi-ocr/Umi-OCR_Paddle_v2.1.5/Umi-OCR.exe`，
+重启服务即可，其余配置不用动。
+
+两点实践结论（已在真机验证）：
+
+- Umi-OCR 的启动器会派生真实主进程后自己退出，因此后端不依赖进程句柄判断状态，
+  而是以 HTTP 探测为准，并用 Umi-OCR 自带的 `--hide`／`--quit` 命令接口控制窗口与关闭。
+- **不同引擎的参数名并不一样**：Rapid 版上报的是 `ocr.angle`、`ocr.maxSideLen`，
+  Paddle 版上报的是 `ocr.cls`、`ocr.limit_side_len`。所以识别参数界面必须由后端
+  动态读取引擎自报的参数表来生成（`GET /api/system/ocr-options` 已按此实现），
+  不能在代码里写死参数名。
 ## 快速开始（开发机）
 
 ```powershell

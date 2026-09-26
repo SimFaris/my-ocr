@@ -29,6 +29,7 @@ class UmiManager(object):
         self.probe_client = probe_client or UmiClient(
             host=config['umi_host'], port=config['umi_port'], timeout=3, retries=1)
         self.check_interval = 30
+        self.start_wait_seconds = 30
         self.max_restarts = 5
         self._process = None
         self._process_started_at = None
@@ -128,16 +129,20 @@ class UmiManager(object):
                 return False, None
         if not self.start_process():
             return False, None
-        time.sleep(1.5)
-        online, options = self.probe()
-        if online:
-            # Umi-OCR 的启动器会派生真实主进程后自己退出，命令行参数不会传过去，
-            # 因此隐藏窗口要用它自带的命令接口在启动后再执行一次。
-            self._cli('--hide')
-        else:
-            with self._lock:
-                self._restarts += 1
-        return online, options
+        # 冷启动时 Umi-OCR 需要若干秒才把 HTTP 服务拉起来，必须轮询等待；
+        # 否则会被误判成"重启失败"，监控线程几轮之后就会耗尽重启次数。
+        deadline = time.time() + self.start_wait_seconds
+        while time.time() < deadline:
+            time.sleep(1.5)
+            online, options = self.probe()
+            if online:
+                # Umi-OCR 的启动器会派生真实主进程后自己退出，命令行参数不会传过去，
+                # 因此隐藏窗口要用它自带的命令接口在启动后再执行一次。
+                self._cli('--hide')
+                return True, options
+        with self._lock:
+            self._restarts += 1
+        return False, None
 
     # ---------- 监控线程 ----------
     def start_monitor(self):
