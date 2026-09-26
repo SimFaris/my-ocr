@@ -134,3 +134,17 @@ start_server.bat --no-https --http-port 8088
   `Secure` 标记；写操作校验 `X-CSRF-Token`；登录失败 5 次锁定 5 分钟。
 - `data/certs/ca.key` 与 `server.key` 为私钥，**不可外发**。
 - 所有文件访问都通过数据库记录映射，磁盘文件名为 uuid，防止路径穿越。
+
+## 常见问题
+
+**页面白屏，控制台报 `Expected a JavaScript-or-Wasm module script but the server
+responded with a MIME type of "text/plain"`。**
+Windows 注册表把 `.js` 的 Content Type 登记成了 `text/plain`，Python 的 `mimetypes`
+会照抄这个结果，浏览器于是拒绝加载 ES 模块。后端已显式注册前端资源类型
+（`backend/app.py` 里的 `register_mime_types`），不需要改注册表。
+改完代码后请在浏览器里按 `Ctrl+F5` 强制刷新一次，清掉此前缓存的错误响应。
+
+**控制台出现 `chrome-extension://...` 报错、`No Listener: tabs:outgoing.message.ready`
+或 `GET chrome-extension://invalid/ net::ERR_FAILED`。**
+这些来自浏览器插件（常见于带助手类插件的 Chrome），与本系统无关。想确认的话，
+用无痕窗口或禁用插件后访问一次即可。

@@ -3,6 +3,7 @@
 
 import hmac
 import logging
+import mimetypes
 import os
 import secrets
 from datetime import timedelta
@@ -60,7 +61,39 @@ def _placeholder_page():
         '</body></html>')
 
 
+# Windows 注册表常把 .js 的 Content Type 登记成 text/plain，Python 的 mimetypes
+# 会照抄这个结果，于是后端拿 text/plain 返回 JS 文件；浏览器按规范会拒绝加载
+# ES 模块（报 "Expected a JavaScript-or-Wasm module script"），页面直接白屏。
+# 因此这里显式覆盖常见前端资源的类型，不依赖操作系统注册表。
+MIME_TYPES = {
+    'application/javascript': ('.js', '.mjs'),
+    'text/css': ('.css',),
+    'application/json': ('.json', '.map'),
+    'application/wasm': ('.wasm',),
+    'image/svg+xml': ('.svg',),
+    'image/png': ('.png',),
+    'image/jpeg': ('.jpg', '.jpeg'),
+    'image/gif': ('.gif',),
+    'image/webp': ('.webp',),
+    'image/x-icon': ('.ico',),
+    'font/woff': ('.woff',),
+    'font/woff2': ('.woff2',),
+    'font/ttf': ('.ttf',),
+    'application/pdf': ('.pdf',),
+    'text/csv': ('.csv',),
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ('.xlsx',),
+}
+
+
+def register_mime_types():
+    """显式注册前端资源类型，避免被操作系统注册表带偏。可重复调用。"""
+    for mime, extensions in MIME_TYPES.items():
+        for extension in extensions:
+            mimetypes.add_type(mime, extension, strict=True)
+
+
 def create_app(config=None, base_dir=None):
+    register_mime_types()
     config = config or load_config(base_dir=base_dir)
     setup_logging(config.log_dir, config['log_level'])
 
