@@ -6,6 +6,7 @@ import JobDetail from './views/JobDetail.vue'
 import Camera from './views/Camera.vue'
 import Search from './views/Search.vue'
 import Admin from './views/Admin.vue'
+import Account from './views/Account.vue'
 import Dashboard from './views/Dashboard.vue'
 import store from './store'
 
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: '/camera', name: 'camera', component: Camera, meta: { requiresAuth: true } },
     { path: '/jobs', name: 'jobs', component: Jobs, meta: { requiresAuth: true } },
     { path: '/jobs/:id', name: 'job-detail', component: JobDetail, meta: { requiresAuth: true } },
+    { path: '/account', name: 'account', component: Account, meta: { requiresAuth: true } },
     { path: '/search', name: 'search', component: Search, meta: { requiresAuth: true } },
     { path: '/admin', name: 'admin', component: Admin, meta: { requiresAuth: true, requiresAdmin: true } },
     { path: '/status', name: 'status', component: Dashboard, meta: { requiresAuth: true } },

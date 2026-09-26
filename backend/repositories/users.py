@@ -3,8 +3,12 @@
 
 from pathlib import Path
 
+import logging
+
 from .. import security
 from ..utils import now_iso
+
+log = logging.getLogger(__name__)
 
 _PUBLIC_FIELDS = 'id, username, display_name, role, is_active, created_at, last_login_at'
 
@@ -75,6 +79,16 @@ def public_view(row):
         'created_at': row['created_at'],
         'last_login_at': row['last_login_at'],
     }
+
+
+def drop_initial_password_file(data_dir):
+    """改密或重置密码后删除初始密码文件。"""
+    marker = Path(data_dir) / 'initial_admin_password.txt'
+    try:
+        if marker.is_file():
+            marker.unlink()
+    except OSError as exc:
+        log.warning('删除初始密码文件失败：%s', exc)
 
 
 def ensure_initial_admin(db, data_dir, username='admin'):

@@ -28,6 +28,7 @@ async function onLogout() {
       <span class="who">
         {{ user.display_name || user.username }}（{{ user.role === 'admin' ? '管理员' : '普通用户' }}）
       </span>
+      <router-link class="link" to="/account">修改密码</router-link>
       <button class="link" type="button" @click="onLogout">退出登录</button>
     </header>
     <main class="content">

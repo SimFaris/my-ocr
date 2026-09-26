@@ -2,7 +2,6 @@
 """认证接口：登录、注销、当前用户、改密码。"""
 
 import logging
-from pathlib import Path
 
 from flask import Blueprint, request, session
 
@@ -89,15 +88,5 @@ def change_password():
     db = ctx['db']
     users_repo.set_password(db, user['id'], new_password)
     audit.write(db, 'password_changed', user_id=user['id'], ip=client_ip())
-    _drop_initial_password_file(ctx['config'].data_dir)
+    users_repo.drop_initial_password_file(ctx['config'].data_dir)
     return ok({'changed': True})
-
-
-def _drop_initial_password_file(data_dir):
-    """改密成功后删除初始密码文件。"""
-    marker = Path(data_dir) / 'initial_admin_password.txt'
-    try:
-        if marker.is_file():
-            marker.unlink()
-    except OSError as exc:
-        log.warning('删除初始密码文件失败：%s', exc)

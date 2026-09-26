@@ -109,6 +109,20 @@ powershell -ExecutionPolicy Bypass -File tools\register_service.ps1
 再手工启动一次 Umi-OCR 确认它的 HTTP 服务已开启。服务会自动重启引擎，连续 5 次失败后会停止
 自动重启并在状态页提示，需要人工介入。
 
+**忘记管理员密码**
+在服务机上执行（不需要服务处于停止状态）：
+
+```
+.\.venv\Scripts\python.exe tools\reset_admin.py --list
+.\.venv\Scripts\python.exe tools\reset_admin.py --username admin
+```
+
+不带 `--password` 时会生成随机密码并打印。用的是免安装运行时的话，把前面的解释器换成
+`vendor\runtime38\python.exe`。
+
+注意：重置密码不会让已登录的会话立即失效（会话默认 7 天）。如果是因为账号疑似泄露而重置，
+请同时删除 `data\session.key` 并重启服务，强制所有人重新登录。
+
 **日志在哪**
 `data\logs\app.log`（服务日志）、`data\logs\umi-ocr.log`（引擎输出）。
 

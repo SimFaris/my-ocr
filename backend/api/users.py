@@ -107,6 +107,9 @@ def update_user(user_id):
             return fail('invalid_request', '密码至少 8 位', 400)
         users_repo.set_password(db, user_id, new_password)
         changed['password_reset'] = True
+        if user_id == actor['id']:
+            # 自己改了密码，初始密码文件就不再有效了
+            users_repo.drop_initial_password_file(context()['config'].data_dir)
 
     if not changed:
         return fail('invalid_request', '没有需要修改的内容', 400)
