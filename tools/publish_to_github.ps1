@@ -24,7 +24,10 @@ param(
     [switch]$SkipPush
 )
 
-$ErrorActionPreference = 'Stop'
+# 这里刻意用 Continue：脚本要驱动 gh/git/ssh 等外部命令，
+# 它们的 stderr 在 Stop 策略下会被当成终止性错误（例如 gh auth status 未登录时的提示），
+# 导致脚本提前退出、错误信息还很难看。所以改为显式检查各命令的退出码。
+$ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
@@ -61,7 +64,7 @@ if (-not $gh) {
 }
 Write-Host "使用 gh：$gh" -ForegroundColor Cyan
 
-& $gh auth status *> $null
+& $gh auth status *> $null 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host ''
     Write-Host '[需要你先登录一次]' -ForegroundColor Yellow
