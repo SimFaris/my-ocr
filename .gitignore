@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+
+# 运行时数据（含上传文件、识别结果、证书私钥、数据库）
+data/
+
+# 本地配置与密钥
+config.local.json
+*.secret
+
+# 编辑器/系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 临时
+.scratch/
+*.log
