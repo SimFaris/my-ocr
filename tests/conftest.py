@@ -14,14 +14,26 @@ from backend.app import create_app      # noqa: E402
 from backend.config import load_config  # noqa: E402
 
 
+def build_config(tmp_path, overrides=None):
+    """测试配置：独立数据目录、指向必然连不上的 Umi 端口、前端目录默认不存在。
+
+    前端目录默认指向一个不存在的路径，让"前端未构建时的占位页"行为可确定复现；
+    需要验证静态文件托管时用 app_factory(dist_dir=...) 指定真实目录。
+    """
+    values = {
+        'data_dir': str(tmp_path / 'data'),
+        'frontend_dist_dir': str(tmp_path / 'no-frontend'),
+        'umi_autostart': False,
+        'umi_port': 9,
+    }
+    if overrides:
+        values.update(overrides)
+    return load_config(base_dir=PROJECT_ROOT, env={}, overrides=values)
+
+
 @pytest.fixture
 def app_config(tmp_path):
-    """测试用配置：独立数据目录，Umi 指向一个必然连不上的端口。"""
-    return load_config(base_dir=PROJECT_ROOT, env={
-        'OCR_DATA_DIR': str(tmp_path / 'data'),
-        'OCR_UMI_AUTOSTART': 'false',
-        'OCR_UMI_PORT': '9',
-    })
+    return build_config(tmp_path)
 
 
 @pytest.fixture
@@ -34,6 +46,16 @@ def app(app_config):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def app_factory(tmp_path):
+    """按需构造应用，可覆盖任意配置项。"""
+    def make(**overrides):
+        application = create_app(build_config(tmp_path, overrides))
+        application.config['TESTING'] = True
+        return application
+    return make
 
 
 @pytest.fixture

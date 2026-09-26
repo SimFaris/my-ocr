@@ -12,6 +12,7 @@ DEFAULTS = {
     'enable_https': True,
     'cert_san': '',
     'data_dir': 'data',
+    'frontend_dist_dir': 'frontend/dist',
     'umi_exe_path': 'vendor/umi-ocr/Umi-OCR.exe',
     'umi_host': '127.0.0.1',
     'umi_port': 1224,
@@ -35,6 +36,7 @@ ENV_MAP = {
     'enable_https': 'OCR_ENABLE_HTTPS',
     'cert_san': 'OCR_CERT_SAN',
     'data_dir': 'OCR_DATA_DIR',
+    'frontend_dist_dir': 'OCR_FRONTEND_DIST',
     'umi_exe_path': 'OCR_UMI_EXE',
     'umi_host': 'OCR_UMI_HOST',
     'umi_port': 'OCR_UMI_PORT',
@@ -161,6 +163,7 @@ def load_config(base_dir=None, config_path=None, env=None, overrides=None):
             if value is not None:
                 values[key] = value
     values['data_dir'] = _resolve(base, values['data_dir'])
+    values['frontend_dist_dir'] = _resolve(base, values['frontend_dist_dir'])
     values['umi_exe_path'] = _resolve(base, values['umi_exe_path'])
     if values['session_secret_file']:
         values['session_secret_file'] = _resolve(base, values['session_secret_file'])

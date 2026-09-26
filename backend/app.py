@@ -6,6 +6,7 @@ import logging
 import os
 import secrets
 from datetime import timedelta
+from pathlib import Path
 
 from flask import Flask, g, jsonify, request, send_from_directory, session
 from werkzeug.exceptions import HTTPException
@@ -133,7 +134,7 @@ def create_app(config=None, base_dir=None):
     app.register_blueprint(auth_api.bp)
     app.register_blueprint(system_api.bp)
 
-    dist_dir = config.base_dir / 'frontend' / 'dist'
+    dist_dir = Path(config['frontend_dist_dir'])
 
     @app.get('/')
     def _index():
