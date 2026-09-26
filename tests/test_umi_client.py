@@ -81,12 +81,18 @@ def test_document_flow(tmp_path, fake):
     task_id = client.doc_upload(str(document), {'doc.extractionMode': 'mixed'})
     assert task_id == 'fake-doc-1'
 
-    status = client.doc_result(task_id)
+    status = None
+    for _ in range(10):
+        status = client.doc_result(task_id)
+        if status['is_done']:
+            break
     assert status['is_done'] is True
-    assert status['pages_count'] == 1
+    assert status['pages_count'] == 3
+    assert status['processed_count'] == 3
 
-    with_text = client.doc_result(task_id, with_data=True)
-    assert with_text['data'] == '第 1 页文字'
+    with_text = client.doc_result(task_id, with_data=True, unread=False)
+    assert '第 1 页文字' in with_text['data']
+    assert '第 3 页文字' in with_text['data']
 
     artifact = client.doc_download(task_id, ['txtPlain'])
     assert artifact['url'].startswith('/download/')

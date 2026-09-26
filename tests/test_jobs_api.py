@@ -40,11 +40,20 @@ def test_create_job_and_list(api_client, admin):
     assert listing['items'][0]['id'] == job['id']
 
 
-def test_create_job_rejects_disabled_source(api_client, admin):
+def test_create_job_accepts_pdf_and_rejects_mixed(api_client, admin):
+    """PDF 在 M3 开放；mixed 仍未开放。"""
     api = api_client(admin['username'], admin['password'])
-    response = create_job(api, source_type='pdf')
+    assert create_job(api, source_type='pdf').status_code == 201
+    response = create_job(api, source_type='mixed')
     assert response.status_code == 400
     assert response.get_json()['error']['code'] == 'invalid_request'
+
+
+def test_pdf_job_declares_accepted_kinds(api_client, admin):
+    api = api_client(admin['username'], admin['password'])
+    payload = create_job(api, source_type='pdf').get_json()['data']
+    assert payload['accepts'] == ['pdf']
+    assert '.pdf' in payload['pdf_extensions']
 
 
 def test_create_job_rejects_bad_source(api_client, admin):

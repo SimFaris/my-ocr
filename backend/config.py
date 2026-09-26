@@ -25,6 +25,11 @@ DEFAULTS = {
     'upload_max_mb': 200,
     'retention_days': 90,
     'disk_min_free_gb': 5,
+    'pdf_poll_interval': 1.0,
+    'pdf_item_timeout_base': 300,
+    'pdf_item_timeout_per_page': 20,
+    'pdf_item_timeout_max': 7200,
+    'pdf_stall_seconds': 600,
     'log_level': 'INFO',
     'session_secret_file': '',
 }
@@ -46,6 +51,8 @@ ENV_MAP = {
     'upload_max_mb': 'OCR_UPLOAD_MAX_MB',
     'retention_days': 'OCR_RETENTION_DAYS',
     'disk_min_free_gb': 'OCR_DISK_MIN_FREE_GB',
+    'pdf_poll_interval': 'OCR_PDF_POLL_INTERVAL',
+    'pdf_stall_seconds': 'OCR_PDF_STALL_SECONDS',
     'log_level': 'OCR_LOG_LEVEL',
 }
 
@@ -62,6 +69,11 @@ def _coerce(key, raw, default):
             return int(text)
         except ValueError:
             raise ValueError('配置项 %s 需要整数，收到 %r' % (key, raw))
+    if isinstance(default, float):
+        try:
+            return float(text)
+        except ValueError:
+            raise ValueError('配置项 %s 需要小数，收到 %r' % (key, raw))
     return text
 
 
@@ -146,7 +158,7 @@ def load_config(base_dir=None, config_path=None, env=None, overrides=None):
             if key not in DEFAULTS:
                 raise ValueError('config.json 中出现未知配置项：%s' % key)
             default = DEFAULTS[key]
-            if isinstance(default, (bool, int)) and not isinstance(value, (bool, int)):
+            if isinstance(default, (bool, int, float)) and not isinstance(value, (bool, int, float)):
                 values[key] = _coerce(key, value, default)
             else:
                 values[key] = value

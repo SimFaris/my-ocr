@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ..repositories import items as items_repo
 from ..repositories import jobs as jobs_repo
-from ..umi import UmiError
+from ..umi import UmiError, flatten_data
 
 log = logging.getLogger(__name__)
 
@@ -70,8 +70,150 @@ def run_image_item(context, item):
                       preview=text[:PREVIEW_CHARS], duration_ms=_elapsed_ms(started))
 
 
-# 输入类型 -> 处理函数。PDF 在 M3 加入，摄像头拍摄的图片复用 image。
-HANDLERS = {'image': run_image_item}
+def _document_timeout(config, page_total):
+    """按页数估算文档识别超时时间（页数未知时按 0 页算基准值）。"""
+    base = float(config['pdf_item_timeout_base'])
+    per_page = float(config['pdf_item_timeout_per_page'])
+    limit = float(config['pdf_item_timeout_max'])
+    return min(limit, base + per_page * int(page_total or 0))
+
+
+def _job_canceled(db, job_id):
+    job = jobs_repo.get(db, job_id)
+    return job is None or job['status'] == 'canceled'
+
+
+def _poll_document(context, item, client, umi_task_id, started):
+    """轮询文档任务并回写页级进度，返回结束原因。"""
+    config = context['config']
+    db = context['db']
+    poll_interval = float(config['pdf_poll_interval'])
+    stall_seconds = float(config['pdf_stall_seconds'])
+
+    page_total = None
+    last_done = -1
+    last_progress_at = time.time()
+
+    while True:
+        if _job_canceled(db, item['job_id']):
+            return {'state': 'canceled'}
+        timeout = _document_timeout(config, page_total)
+        if time.time() - started > timeout:
+            return {'state': 'timeout', 'message': '文档识别超时（超过 %d 秒）' % timeout}
+        if time.time() - last_progress_at > stall_seconds:
+            return {'state': 'stalled', 'message': '文档识别长时间没有进展'}
+
+        try:
+            data = client.doc_result(umi_task_id, with_data=False)
+        except UmiError as exc:
+            return {'state': 'failure', 'code': exc.code, 'message': exc.message}
+
+        page_total = data.get('pages_count') or page_total
+        page_done = data.get('processed_count')
+        items_repo.set_progress(db, item['id'], page_done=page_done, page_total=page_total)
+
+        if page_done is not None and page_done != last_done:
+            last_done = page_done
+            last_progress_at = time.time()
+
+        if data.get('is_done'):
+            if data.get('state') == 'success':
+                return {'state': 'success'}
+            return {'state': 'failure', 'code': 'umi_doc_failed',
+                    'message': data.get('message') or '文档识别失败'}
+        time.sleep(poll_interval)
+
+
+def run_pdf_item(context, item):
+    """识别单个 PDF：上传 → 轮询页级进度 → 取文本 →（可选）产出双层 PDF → 清理。"""
+    config = context['config']
+    db = context['db']
+    client = context['umi'].client
+
+    job = jobs_repo.get(db, item['job_id'])
+    options = dict(jobs_repo.get_options(job) if job else {})
+    want_layered = bool(options.pop('laying_pdf', False))
+    if not options.get('doc.extractionMode'):
+        options['doc.extractionMode'] = 'mixed'
+
+    started = time.time()
+    source = Path(config.data_dir) / item['stored_relpath']
+    if not source.is_file():
+        items_repo.finish(db, item['id'], 'failed', error_code='file_missing',
+                          error_message='原始文件不存在', duration_ms=_elapsed_ms(started))
+        return
+
+    try:
+        umi_task_id = client.doc_upload(str(source), options)
+    except UmiError as exc:
+        log.warning('文档 %s 上传失败：%s', item['id'], exc.message)
+        items_repo.finish(db, item['id'], 'failed', error_code=exc.code,
+                          error_message=exc.message, duration_ms=_elapsed_ms(started))
+        return
+    except OSError as exc:
+        items_repo.finish(db, item['id'], 'failed', error_code='file_read_failed',
+                          error_message='读取原始文件失败：%s' % exc,
+                          duration_ms=_elapsed_ms(started))
+        return
+
+    items_repo.set_umi_task(db, item['id'], umi_task_id)
+    try:
+        outcome = _poll_document(context, item, client, umi_task_id, started)
+        state = outcome.get('state')
+
+        if state == 'canceled':
+            items_repo.finish(db, item['id'], 'skipped', duration_ms=_elapsed_ms(started))
+            return
+        if state in ('timeout', 'stalled'):
+            items_repo.finish(db, item['id'], 'failed', error_code=state,
+                              error_message=outcome.get('message'),
+                              duration_ms=_elapsed_ms(started))
+            return
+        if state == 'failure':
+            items_repo.finish(db, item['id'], 'failed',
+                              error_code=outcome.get('code') or 'umi_doc_failed',
+                              error_message=outcome.get('message') or '文档识别失败',
+                              duration_ms=_elapsed_ms(started))
+            return
+
+        try:
+            result = client.doc_result(umi_task_id, with_data=True, unread=False, fmt='text')
+        except UmiError as exc:
+            items_repo.finish(db, item['id'], 'failed', error_code=exc.code,
+                              error_message='取回识别文本失败：%s' % exc.message,
+                              duration_ms=_elapsed_ms(started))
+            return
+
+        text = flatten_data(result.get('data'))
+        artifacts = {}
+        if want_layered:
+            try:
+                artifact = client.doc_download(umi_task_id, file_types=['pdfLayered'])
+                relpath = 'results/%s/%s.pdf' % (item['job_id'], item['id'])
+                client.download(artifact['url'], Path(config.data_dir) / relpath)
+                artifacts['pdfLayered'] = relpath
+            except UmiError as exc:
+                # 双层 PDF 生成失败不影响文本结果，但要留下原因
+                log.warning('文档 %s 产出双层 PDF 失败：%s', item['id'], exc.message)
+                artifacts['pdfLayeredError'] = exc.message
+
+        if not text.strip():
+            items_repo.finish(db, item['id'], 'empty', char_count=0, preview='',
+                              duration_ms=_elapsed_ms(started), artifacts=artifacts or None)
+            return
+
+        relpath = _write_text(config, item, text)
+        items_repo.finish(db, item['id'], 'done', text_relpath=relpath, char_count=len(text),
+                          preview=text[:PREVIEW_CHARS], duration_ms=_elapsed_ms(started),
+                          artifacts=artifacts or None)
+    finally:
+        # 无论成败都清理 Umi 侧任务，避免其临时文件堆积
+        if umi_task_id:
+            client.doc_clear(umi_task_id)
+
+
+# 输入类型 -> 处理函数。摄像头拍摄的图片复用 image 处理。
+HANDLERS = {'image': run_image_item, 'pdf': run_pdf_item}
 
 
 class Worker(threading.Thread):

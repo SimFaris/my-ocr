@@ -5,39 +5,65 @@ import { api, getCsrfToken } from '../api'
 
 const router = useRouter()
 
+const sourceType = ref('image')       // image | pdf
 const title = ref('')
 const entries = ref([])
-const options = ref({})
-const selected = ref({})
+const imageOptions = ref({})
+const docOptions = ref({})
+const selectedImage = ref({})
+const selectedDoc = ref({})
+const wantedLayered = ref(false)
 const busy = ref(false)
 const error = ref('')
 const stage = ref('')
 const dragging = ref(false)
 
 let counter = 0
-const OPTION_KEYS = ['ocr.language', 'ocr.cls', 'ocr.angle', 'ocr.limit_side_len', 'ocr.maxSideLen', 'tbpu.parser']
+const IMAGE_KEYS = ['ocr.language', 'tbpu.parser', 'ocr.limit_side_len', 'ocr.maxSideLen']
+const DOC_KEYS = ['ocr.language', 'tbpu.parser', 'doc.extractionMode']
+
+const isPdf = computed(() => sourceType.value === 'pdf')
+
+function fieldsOf(schema, keys) {
+  return keys
+    .filter((key) => schema[key] && schema[key].optionsList)
+    .map((key) => Object.assign({ key: key }, schema[key]))
+}
 
 const optionFields = computed(() =>
-  OPTION_KEYS
-    .filter((key) => options.value[key] && options.value[key].optionsList)
-    .map((key) => Object.assign({ key: key }, options.value[key])),
+  isPdf.value ? fieldsOf(docOptions.value, DOC_KEYS) : fieldsOf(imageOptions.value, IMAGE_KEYS),
 )
-
+const selected = computed(() => (isPdf.value ? selectedDoc.value : selectedImage.value))
 const readyCount = computed(() => entries.value.filter((item) => item.status === 'ready').length)
 const totalSize = computed(() => entries.value.reduce((sum, item) => sum + item.size, 0))
 
 onMounted(async () => {
   try {
-    options.value = (await api('GET', '/api/system/ocr-options')) || {}
-    const initial = {}
-    for (const field of optionFields.value) {
-      initial[field.key] = field.default
-    }
-    selected.value = initial
+    imageOptions.value = (await api('GET', '/api/system/ocr-options')) || {}
+    const initialImage = {}
+    for (const field of fieldsOf(imageOptions.value, IMAGE_KEYS)) initialImage[field.key] = field.default
+    selectedImage.value = initialImage
   } catch (err) {
-    error.value = '读取识别参数失败：' + err.message
+    error.value = '读取图片识别参数失败：' + err.message
+  }
+  try {
+    docOptions.value = (await api('GET', '/api/system/doc-options')) || {}
+    const initialDoc = {}
+    for (const field of fieldsOf(docOptions.value, DOC_KEYS)) initialDoc[field.key] = field.default
+    selectedDoc.value = initialDoc
+  } catch (err) {
+    // 文档参数取不到不影响使用，引擎会用默认值
+    docOptions.value = {}
   }
 })
+
+function switchSource(next) {
+  if (next === sourceType.value) return
+  if (entries.value.length && !window.confirm('切换来源会清空当前已选文件，继续吗？')) return
+  sourceType.value = next
+  entries.value = []
+  error.value = ''
+}
 
 function addFiles(list) {
   for (const file of Array.from(list || [])) {
@@ -119,18 +145,23 @@ function uploadOne(jobId, entry, token) {
 
 async function startImport() {
   if (!entries.value.length) {
-    error.value = '请先选择要识别的图片'
+    error.value = '请先选择要识别的文件'
     return
   }
   busy.value = true
   error.value = ''
   try {
+    const jobOptions = Object.assign({}, selected.value)
+    if (isPdf.value && wantedLayered.value) {
+      jobOptions.laying_pdf = true
+    }
+
     stage.value = '正在创建任务…'
     const created = await api('POST', '/api/jobs', {
       json: {
-        title: title.value.trim() || ('图片任务 ' + new Date().toLocaleString()),
-        source_type: 'image',
-        ocr_options: selected.value,
+        title: title.value.trim() || ((isPdf.value ? 'PDF 任务 ' : '图片任务 ') + new Date().toLocaleString()),
+        source_type: sourceType.value,
+        ocr_options: jobOptions,
       },
     })
     const jobId = created.job.id
@@ -143,8 +174,7 @@ async function startImport() {
       stage.value = '正在上传 ' + index + '/' + entries.value.length + '：' + entry.name
       await uploadOne(jobId, entry, token)
     }
-    const uploaded = entries.value.filter((item) => item.status === 'uploaded').length
-    if (!uploaded) throw new Error('没有成功上传的文件')
+    if (!entries.value.some((item) => item.status === 'uploaded')) throw new Error('没有成功上传的文件')
 
     stage.value = '正在提交识别任务…'
     await api('POST', '/api/jobs/' + jobId + '/start')
@@ -161,10 +191,17 @@ async function startImport() {
 <template>
   <div>
     <div class="card">
-      <h2>批量导入图片</h2>
-      <p class="hint">
+      <h2>批量导入</h2>
+      <div class="row" style="justify-content: flex-start; margin: 0 0 6px">
+        <button class="ghost" type="button" :class="{ active: !isPdf }" @click="switchSource('image')">图片</button>
+        <button class="ghost" type="button" :class="{ active: isPdf }" @click="switchSource('pdf')">PDF 文档</button>
+      </div>
+
+      <p v-if="!isPdf" class="hint">
         支持多选、拖拽、整文件夹导入。格式：jpg / jpeg / jfif / png / webp / bmp / tif / tiff。
-        上传完成后自动进入识别队列。
+      </p>
+      <p v-else class="hint">
+        支持多选 PDF（扫描件或电子文档）。扫描件按页识别，可选择同时产出双层可搜索 PDF。
       </p>
 
       <div
@@ -174,13 +211,18 @@ async function startImport() {
         @dragleave.prevent="dragging = false"
         @drop.prevent="onDrop"
       >
-        <p>把图片拖到这里，或使用下面的按钮选择</p>
+        <p>把文件拖到这里，或使用下面的按钮选择</p>
         <div class="row">
           <label class="btn">
-            选择图片
-            <input type="file" multiple accept="image/*,.tif,.tiff" @change="onPick" />
+            {{ isPdf ? '选择 PDF 文件' : '选择图片' }}
+            <input
+              type="file"
+              multiple
+              :accept="isPdf ? '.pdf,application/pdf' : 'image/*,.tif,.tiff'"
+              @change="onPick"
+            />
           </label>
-          <label class="btn ghost">
+          <label v-if="!isPdf" class="btn ghost">
             选择整个文件夹
             <input type="file" webkitdirectory directory multiple @change="onPick" />
           </label>
@@ -203,7 +245,14 @@ async function startImport() {
           </select>
         </label>
       </div>
-      <p v-else class="hint">识别参数暂不可用（引擎未就绪时无法读取），将使用引擎默认值。</p>
+      <p v-else class="hint">识别参数暂不可用（引擎未就绪时读不到），将使用引擎默认值。</p>
+
+      <p v-if="isPdf" class="kv-inline">
+        <label class="checkbox">
+          <input v-model="wantedLayered" type="checkbox" />
+          生成双层可搜索 PDF（在原扫描图上叠加文字层，可复制可检索）
+        </label>
+      </p>
     </div>
 
     <div v-if="entries.length" class="card">

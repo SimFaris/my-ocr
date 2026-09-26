@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 bp = Blueprint('system', __name__, url_prefix='/api/system')
 
 CACHE_SECONDS = 300
-_options_cache = {'data': None, 'fetched_at': 0.0}
+_options_cache = {}
 _cache_lock = threading.Lock()
 
 
@@ -50,21 +50,22 @@ def status():
     })
 
 
-@bp.get('/ocr-options')
-@login_required
-def ocr_options():
-    """代理 Umi-OCR 的图片识别参数定义，缓存 5 分钟。"""
-    ctx = context()
-    manager = ctx['umi']
+def _cached_options(kind):
+    """代理 Umi-OCR 的参数定义并缓存 5 分钟；取不到时退回旧缓存。"""
+    manager = context()['umi']
     now = time.time()
     with _cache_lock:
-        cached = _options_cache['data']
-        fetched_at = _options_cache['fetched_at']
+        entry = _options_cache.setdefault(kind, {'data': None, 'fetched_at': 0.0})
+        cached = entry['data']
+        fetched_at = entry['fetched_at']
     if cached is not None and (now - fetched_at) < CACHE_SECONDS:
         return ok(cached)
 
     try:
-        data = manager.client.get_ocr_options()
+        if kind == 'doc':
+            data = manager.client.get_doc_options()
+        else:
+            data = manager.client.get_ocr_options()
     except UmiError as exc:
         if cached is not None:
             log.warning('取识别参数失败，返回缓存：%s', exc)
@@ -72,9 +73,22 @@ def ocr_options():
         return fail('umi_unavailable', '无法从 Umi-OCR 获取识别参数：%s' % exc, 503)
 
     with _cache_lock:
-        _options_cache['data'] = data
-        _options_cache['fetched_at'] = now
+        _options_cache[kind] = {'data': data, 'fetched_at': now}
     return ok(data)
+
+
+@bp.get('/ocr-options')
+@login_required
+def ocr_options():
+    """图片识别参数定义（供前端生成设置界面）。"""
+    return _cached_options('ocr')
+
+
+@bp.get('/doc-options')
+@login_required
+def doc_options():
+    """文档（PDF）识别参数定义。"""
+    return _cached_options('doc')
 
 
 @bp.get('/root-cert')

@@ -3,6 +3,7 @@
 
 import logging
 import shutil
+import zipfile
 from pathlib import Path
 
 from flask import Blueprint, request, send_file
@@ -12,7 +13,8 @@ from ..repositories import items as items_repo
 from ..repositories import jobs as jobs_repo
 from ..security import current_user, login_required
 from ..services.export import export_csv, export_txt
-from ..services.ingest import IMAGE_EXTENSIONS, IngestError, accept_upload
+from ..services.ingest import (IMAGE_EXTENSIONS, PDF_EXTENSIONS, IngestError,
+                               accept_upload)
 from ..utils import disk_usage
 from .common import (client_ip, context, fail, item_view, job_view,
                      load_job_or_error, ok)
@@ -22,9 +24,11 @@ log = logging.getLogger(__name__)
 bp = Blueprint('jobs', __name__, url_prefix='/api')
 
 SOURCE_TYPES = ('image', 'pdf', 'camera', 'mixed')
-# M2 开放图片来源；PDF 在 M3、摄像头在 M4 接入
-ENABLED_SOURCE_TYPES = ('image', 'camera')
-EXPORT_FORMATS = ('txt', 'csv')
+# 摄像头拍摄在 M4 接入；mixed 暂不开放
+ENABLED_SOURCE_TYPES = ('image', 'pdf', 'camera')
+# 每种来源允许的文件类型（以文件头判定为准）
+SOURCE_KINDS = {'image': ('image',), 'camera': ('image',), 'pdf': ('pdf',)}
+EXPORT_FORMATS = ('txt', 'csv', 'pdflayered')   # 与入参统一为小写，接口仍接受 pdfLayered
 _ILLEGAL_FILENAME_CHARS = set('\\/:*?"<>|')
 
 
@@ -65,7 +69,7 @@ def create_job():
     if source_type not in SOURCE_TYPES:
         return fail('invalid_request', 'source_type 取值无效', 400)
     if source_type not in ENABLED_SOURCE_TYPES:
-        return fail('invalid_request', '该来源类型尚未开放（PDF 见 M3、摄像头见 M4）', 400)
+        return fail('invalid_request', '该来源类型尚未开放（摄像头见 M4）', 400)
 
     options = payload.get('ocr_options') or {}
     if not isinstance(options, dict):
@@ -81,7 +85,10 @@ def create_job():
     audit.write(ctx['db'], 'job_created', user_id=user['id'], target=job_id,
                 detail={'title': title, 'source_type': source_type}, ip=client_ip())
     job = jobs_repo.get(ctx['db'], job_id)
-    return ok({'job': job_view(job), 'image_extensions': list(IMAGE_EXTENSIONS)}, 201)
+    return ok({'job': job_view(job),
+               'image_extensions': list(IMAGE_EXTENSIONS),
+               'pdf_extensions': list(PDF_EXTENSIONS),
+               'accepts': list(SOURCE_KINDS[source_type])}, 201)
 
 
 @bp.post('/jobs/<job_id>/items')
@@ -101,7 +108,8 @@ def upload_item(job_id):
     item_id = items_repo.new_id()
     try:
         relpath, size, kind, _extension = accept_upload(
-            storage, ctx['config'].data_dir, job_id, item_id, allowed_kinds=('image',))
+            storage, ctx['config'].data_dir, job_id, item_id,
+            allowed_kinds=SOURCE_KINDS[job['source_type']])
     except IngestError as exc:
         return fail(exc.code, exc.message, 400)
 
@@ -270,6 +278,45 @@ def delete_job(job_id):
     return ok({'deleted': job_id})
 
 
+def _export_layered(ctx, job, job_id):
+    """下载 PDF 任务产出的双层可搜索 PDF；多个时打包成 zip。"""
+    rows = items_repo.list_all(ctx['db'], job_id)
+    found = []
+    for item in rows:
+        relpath = items_repo.artifacts(item).get('pdfLayered')
+        if not relpath:
+            continue
+        path = Path(ctx['config'].data_dir) / relpath
+        if path.is_file():
+            found.append((item, path))
+    if not found:
+        return fail('invalid_request',
+                    '还没有可下载的双层 PDF，请在导入 PDF 时勾选“生成双层可搜索 PDF”', 400)
+
+    stem = _safe_stem(job['title'])
+    if len(found) == 1:
+        item, path = found[0]
+        name = Path(item['original_name']).stem or stem
+        return send_file(str(path), as_attachment=True,
+                         download_name=name + '.pdf', mimetype='application/pdf')
+
+    target = Path(ctx['config'].data_dir) / 'exports' / job_id / (stem + '-双层PDF.zip')
+    target.parent.mkdir(parents=True, exist_ok=True)
+    used = set()
+    with zipfile.ZipFile(str(target), 'w', zipfile.ZIP_DEFLATED) as archive:
+        for item, path in found:
+            base = Path(item['original_name']).stem or item['id']
+            candidate = base + '.pdf'
+            index = 2
+            while candidate in used:
+                candidate = '%s-%d.pdf' % (base, index)
+                index += 1
+            used.add(candidate)
+            archive.write(str(path), candidate)
+    return send_file(str(target), as_attachment=True,
+                     download_name=stem + '-双层PDF.zip', mimetype='application/zip')
+
+
 @bp.get('/jobs/<job_id>/export')
 @login_required
 def export_job(job_id):
@@ -280,7 +327,9 @@ def export_job(job_id):
 
     fmt = (request.args.get('format') or 'txt').lower()
     if fmt not in EXPORT_FORMATS:
-        return fail('invalid_request', 'format 只支持 txt 或 csv', 400)
+        return fail('invalid_request', 'format 只支持 txt、csv 或 pdfLayered', 400)
+    if fmt == 'pdflayered':
+        return _export_layered(ctx, job, job_id)
     scope = request.args.get('scope') or 'all'
     if scope not in ('all', 'success'):
         return fail('invalid_request', 'scope 只支持 all 或 success', 400)

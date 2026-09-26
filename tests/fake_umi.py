@@ -79,6 +79,8 @@ def create_fake_app(state):
         state['calls'].append('doc_upload')
         if state['mode'] == 'offline':
             return 'service unavailable', 503
+        if state['doc_mode'] == 'encrypted':
+            return jsonify({'code': 403, 'data': '文档已加密，请提供密码'})
         return jsonify({'code': 100, 'data': 'fake-doc-1'})
 
     @app.post('/api/doc/result')
@@ -87,9 +89,25 @@ def create_fake_app(state):
         state['calls'].append('doc_result')
         if state['mode'] == 'offline':
             return 'service unavailable', 503
-        data = '第 1 页文字' if payload.get('is_data') else []
-        return jsonify({'code': 100, 'data': data, 'processed_count': 1,
-                        'pages_count': 1, 'is_done': True, 'state': 'success'})
+
+        pages = int(state['doc_pages'])
+        state['doc_polls'] += 1
+        if state['doc_mode'] == 'stall':
+            # 一直停在第一页，用于验证"长时间无进展"判定
+            return jsonify({'code': 100, 'data': [], 'processed_count': 1,
+                            'pages_count': pages, 'is_done': False, 'state': 'running'})
+
+        processed = min(pages, state['doc_polls'])
+        done = processed >= pages
+        if payload.get('is_data'):
+            text = '\n'.join('第 %d 页文字' % index for index in range(1, processed + 1))
+            data = text
+        else:
+            data = []
+        payload_out = {'code': 100, 'data': data, 'processed_count': processed,
+                       'pages_count': pages, 'is_done': done,
+                       'state': 'success' if done else 'running'}
+        return jsonify(payload_out)
 
     @app.post('/api/doc/download')
     def doc_download():
@@ -115,8 +133,15 @@ def create_fake_app(state):
 class FakeUmi(object):
     """带控制开关的假 Umi-OCR。"""
 
-    def __init__(self, mode='ok', image_text='识别结果示例'):
-        self.state = {'mode': mode, 'image_text': image_text, 'calls': []}
+    def __init__(self, mode='ok', image_text='识别结果示例', doc_pages=3, doc_mode='ok'):
+        self.state = {
+            'mode': mode,
+            'image_text': image_text,
+            'calls': [],
+            'doc_pages': doc_pages,
+            'doc_mode': doc_mode,
+            'doc_polls': 0,
+        }
         self.app = create_fake_app(self.state)
         self.port = None
         self._server = None

@@ -8,6 +8,7 @@
 import argparse
 import logging
 import os
+import socket
 import sys
 import threading
 import time
@@ -19,6 +20,25 @@ from backend.app import create_app
 from backend.config import load_config
 
 log = logging.getLogger(__name__)
+
+
+def port_in_use(host, port):
+    """判断端口是否已被占用。
+
+    这里刻意不使用 SO_REUSEADDR：Windows 上它会让"已被占用"的端口也能绑定成功，
+    结果两个服务实例同时在跑，请求被旧实例接走，排查起来非常费劲。
+    """
+    if not port:
+        return False
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        bind_host = '' if host in ('0.0.0.0', '::') else host
+        probe.bind((bind_host, int(port)))
+    except OSError:
+        return True
+    finally:
+        probe.close()
+    return False
 
 
 def build_servers(app, config):
@@ -67,6 +87,16 @@ def main(argv=None):
 
     config = load_config(base_dir=args.base_dir, config_path=args.config, overrides=overrides)
     app = create_app(config)
+
+    wanted = [('http', int(config['http_port']))]
+    if config['enable_https']:
+        wanted.append(('https', int(config['https_port'])))
+    conflicts = [item for item in wanted if port_in_use(config['host'], item[1])]
+    if conflicts:
+        log.error('以下端口已被占用：%s。通常是上一个服务实例还在运行，请先停止它再启动。',
+                  '、'.join('%s %d' % item for item in conflicts))
+        return 3
+
     servers = build_servers(app, config)
     if not servers:
         log.error('没有可用的监听端口（http/https 都已关闭或证书缺失），退出')

@@ -43,6 +43,7 @@ const failedCount = computed(() => items.value.filter((item) => item.status === 
 const hasEditableText = computed(
   () => !!activeItem.value && ['done', 'empty'].indexOf(activeItem.value.status) >= 0,
 )
+const hasLayered = computed(() => items.value.some((item) => item.has_layered_pdf))
 
 function label(value) {
   return STATUS_LABELS[value] || value
@@ -186,6 +187,11 @@ function downloadItemText(item) {
         <a class="btn ghost" :href="exportUrl('txt', 'all')">导出全部 txt</a>
         <a class="btn ghost" :href="exportUrl('csv', 'all')">导出全部 csv</a>
         <a class="btn ghost" :href="exportUrl('txt', 'success')">仅导出成功项 txt</a>
+        <a
+          v-if="hasLayered"
+          class="btn ghost"
+          :href="exportUrl('pdfLayered', 'all')"
+        >导出双层可搜索 PDF</a>
         <button class="ghost" type="button" :disabled="actionBusy" @click="act('delete')">删除任务</button>
       </div>
       <p v-if="error" class="error">{{ error }}</p>
@@ -210,6 +216,7 @@ function downloadItemText(item) {
                 <td class="ellipsis">{{ item.original_name }}</td>
                 <td>
                   <span class="badge" :class="badgeClass(item.status)">{{ label(item.status) }}</span>
+                  <span v-if="item.page_total" class="hint">　{{ item.page_done || 0 }}/{{ item.page_total }} 页</span>
                 </td>
                 <td>{{ item.char_count === null || item.char_count === undefined ? '-' : item.char_count }}</td>
                 <td class="hint">{{ seconds(item.duration_ms) }}</td>
@@ -228,6 +235,11 @@ function downloadItemText(item) {
             <img class="preview-image" :src="'/api/items/' + activeItem.id + '/preview'" alt="原图预览" />
             <p v-if="textLoading" class="hint">正在读取文本…</p>
             <textarea v-else v-model="activeText" class="textarea" :readonly="!hasEditableText"></textarea>
+            <a
+              v-if="activeItem.has_layered_pdf"
+              class="btn ghost"
+              :href="'/api/items/' + activeItem.id + '/artifact?type=pdfLayered'"
+            >下载双层可搜索 PDF</a>
             <div class="actions">
               <button type="button" :disabled="saving || !hasEditableText" @click="saveText">
                 {{ saving ? '保存中…' : '保存校对结果' }}

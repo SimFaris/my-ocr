@@ -63,6 +63,27 @@ def save_text(item_id):
     return ok({'item': item_view(items_repo.get(ctx['db'], item['id']))})
 
 
+@bp.get('/<item_id>/artifact')
+@login_required
+def get_artifact(item_id):
+    """下载识别产物（目前用于 PDF 的双层可搜索 PDF）。"""
+    item, error = load_item_or_error(item_id)
+    if error:
+        return error
+
+    kind = (request.args.get('type') or 'pdfLayered').strip()
+    relpath = items_repo.artifacts(item).get(kind)
+    if not relpath:
+        return fail('not_found', '该文件没有此产物', 404)
+    path = Path(context()['config'].data_dir) / relpath
+    if not path.is_file():
+        return fail('not_found', '产物文件不存在', 404)
+
+    name = Path(item['original_name']).stem or item['id']
+    return send_file(str(path), as_attachment=True, download_name=name + '.pdf',
+                     mimetype='application/pdf')
+
+
 @bp.get('/<item_id>/preview')
 @login_required
 def preview(item_id):

@@ -165,12 +165,15 @@ class UmiClient(object):
                            code='umi_doc_upload_failed', retryable=False)
         return data.get('data')
 
-    def doc_result(self, task_id, with_data=False, fmt='text'):
-        """查询文档任务状态；with_data=True 时附带识别结果。"""
+    def doc_result(self, task_id, with_data=False, fmt='text', unread=True):
+        """查询文档任务状态；with_data=True 时附带识别结果。
+
+        unread=False 用于任务结束后的最终取词，避免只拿到"未读"的增量。
+        """
         payload = {
             'id': task_id,
             'is_data': bool(with_data),
-            'is_unread': True,
+            'is_unread': bool(unread),
             'format': fmt,
         }
         data = self._json('POST', '/api/doc/result',

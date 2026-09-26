@@ -59,7 +59,10 @@ def item_view(item):
     """任务项的可返回视图（不含识别文本正文）。"""
     if item is None:
         return None
+    artifacts = items_repo.artifacts(item)
     return {
+        'artifacts': artifacts,
+        'has_layered_pdf': bool(artifacts.get('pdfLayered')),
         'id': item['id'],
         'job_id': item['job_id'],
         'seq': item['seq'],

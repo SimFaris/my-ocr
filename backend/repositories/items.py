@@ -81,6 +81,23 @@ def claim(db, item_id):
     return claimed
 
 
+def set_umi_task(db, item_id, umi_task_id):
+    """记录 Umi-OCR 侧的文档任务号，便于排查与清理。"""
+    with db.transaction() as conn:
+        conn.execute('UPDATE job_items SET umi_task_id = ? WHERE id = ?', (umi_task_id, item_id))
+
+
+def artifacts(item):
+    """返回产物字典，例如 {'pdfLayered': 'results/xxx/yyy.pdf'}。"""
+    if not item['artifact_relpaths']:
+        return {}
+    try:
+        value = json.loads(item['artifact_relpaths'])
+    except (ValueError, TypeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def set_progress(db, item_id, page_done=None, page_total=None):
     with db.transaction() as conn:
         conn.execute(

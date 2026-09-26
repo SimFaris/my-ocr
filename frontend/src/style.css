@@ -126,3 +126,8 @@ select, input.title-input { padding: 6px 8px; border: 1px solid #d1d5db; border-
 .preview-image { max-width: 100%; margin: 10px 0; border: 1px solid #e5e7eb; border-radius: 6px; background: #ffffff; }
 .textarea { width: 100%; min-height: 300px; margin-top: 10px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: Consolas, Menlo, monospace; font-size: 13px; line-height: 1.6; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+
+/* M3：来源切换与复选行 */
+button.ghost.active { background: #2563eb; color: #ffffff; border-color: #2563eb; }
+label.checkbox { flex-direction: row; align-items: center; gap: 8px; color: #1f2937; font-size: 14px; }
+label.checkbox input { margin: 0; }

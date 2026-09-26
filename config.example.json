@@ -17,6 +17,11 @@
   "upload_max_mb": 200,
   "retention_days": 90,
   "disk_min_free_gb": 5,
+  "pdf_poll_interval": 1.0,
+  "pdf_item_timeout_base": 300,
+  "pdf_item_timeout_per_page": 20,
+  "pdf_item_timeout_max": 7200,
+  "pdf_stall_seconds": 600,
   "log_level": "INFO",
   "session_secret_file": ""
 }
