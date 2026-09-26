@@ -1,7 +1,9 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
+import store from '../store'
 
+const me = computed(() => store.state.user)
 const users = ref([])
 const settings = ref(null)
 const draft = ref({})
@@ -71,10 +73,12 @@ function changeRole(user) {
 }
 
 function resetPassword(user) {
-  if (!window.confirm('确定重置用户「' + user.username + '」的密码吗？')) return
+  if (!window.confirm('确定重置用户「' + user.username + '」的密码吗？' +
+    '系统会生成一个随机密码，只显示这一次，请及时抄下来交给本人。')) return
   run(async () => {
     const data = await api('PATCH', '/api/users/' + user.id, { json: { reset_password: true } })
-    createdInfo.value = '用户 ' + user.username + ' 的新密码：' + data.new_password
+    createdInfo.value = '用户 ' + user.username + ' 的新密码：' + data.new_password +
+      '（只显示这一次，请立即抄下来；对方登录后可用「修改密码」改成自己的密码）'
     await loadUsers()
   }, '密码已重置')
 }
@@ -127,7 +131,14 @@ function runCleanup() {
               <button class="link" type="button" :disabled="busy" @click="toggleActive(user)">
                 {{ user.is_active ? '停用' : '启用' }}
               </button>
-              <button class="link" type="button" :disabled="busy" @click="resetPassword(user)">重置密码</button>
+              <button
+                v-if="me && user.id !== me.id"
+                class="link"
+                type="button"
+                :disabled="busy"
+                @click="resetPassword(user)"
+              >重置密码</button>
+              <router-link v-else class="link" to="/account">改自己的密码</router-link>
             </td>
           </tr>
         </tbody>
