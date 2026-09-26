@@ -1,5 +1,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import Login from './views/Login.vue'
+import Workbench from './views/Workbench.vue'
+import Jobs from './views/Jobs.vue'
+import JobDetail from './views/JobDetail.vue'
 import Dashboard from './views/Dashboard.vue'
 import store from './store'
 
@@ -7,9 +10,13 @@ import store from './store'
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
+    { path: '/', redirect: '/workbench' },
+    { path: '/workbench', name: 'workbench', component: Workbench, meta: { requiresAuth: true } },
+    { path: '/jobs', name: 'jobs', component: Jobs, meta: { requiresAuth: true } },
+    { path: '/jobs/:id', name: 'job-detail', component: JobDetail, meta: { requiresAuth: true } },
+    { path: '/status', name: 'status', component: Dashboard, meta: { requiresAuth: true } },
     { path: '/login', name: 'login', component: Login },
-    { path: '/:pathMatch(.*)*', redirect: '/' },
+    { path: '/:pathMatch(.*)*', redirect: '/workbench' },
   ],
 })
 
@@ -21,7 +28,7 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.name === 'login' && store.state.user) {
-    return { name: 'dashboard' }
+    return { name: 'workbench' }
   }
   return true
 })

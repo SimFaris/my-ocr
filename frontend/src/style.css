@@ -96,3 +96,33 @@ button.ghost {
 .tile { border: 1px dashed #cbd5e1; border-radius: 8px; padding: 14px 16px; background: #fbfdff; }
 .tile h3 { margin: 0 0 6px; font-size: 14px; }
 .tile p { margin: 0; color: #6b7280; font-size: 13px; }
+
+/* ---- M2：任务相关界面 ---- */
+.nav { display: flex; gap: 16px; margin-left: 20px; }
+.nav a { color: #4b5563; text-decoration: none; padding: 4px 2px; border-bottom: 2px solid transparent; }
+.nav a.router-link-active { color: #2563eb; border-bottom-color: #2563eb; }
+
+.dropzone { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 22px; text-align: center; background: #fbfdff; margin-top: 12px; }
+.dropzone.active { border-color: #2563eb; background: #eff6ff; }
+.row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.row-between { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+
+.btn { display: inline-block; padding: 8px 16px; border: 1px solid #2563eb; background: #2563eb; color: #ffffff; border-radius: 6px; cursor: pointer; font-size: 14px; text-decoration: none; }
+.btn.ghost { background: #ffffff; color: #2563eb; }
+.btn input[type=file] { display: none; }
+
+.table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.table th, .table td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
+.table th { color: #6b7280; font-weight: 500; font-size: 13px; }
+.ellipsis { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+select, input.title-input { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+.title-input { width: 260px; }
+.option-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+.option-row label, .kv-inline label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #6b7280; }
+.kv-inline { margin: 16px 0 0; }
+
+.detail-grid { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.2fr); gap: 18px; }
+.preview-image { max-width: 100%; margin: 10px 0; border: 1px solid #e5e7eb; border-radius: 6px; background: #ffffff; }
+.textarea { width: 100%; min-height: 300px; margin-top: 10px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-family: Consolas, Menlo, monospace; font-size: 13px; line-height: 1.6; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }

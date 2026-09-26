@@ -5,6 +5,10 @@ export function setCsrfToken(token) {
   csrfToken = token || ''
 }
 
+export function getCsrfToken() {
+  return csrfToken
+}
+
 export class ApiError extends Error {
   constructor(code, message, status) {
     super(message)

@@ -251,7 +251,7 @@ job_items(
   original_name TEXT NOT NULL,
   stored_relpath TEXT NOT NULL,         -- 相对 data/uploads 的路径，文件名用 uuid
   byte_size INTEGER NOT NULL,
-  status TEXT NOT NULL,                 -- queued|running|done|empty|failed|skipped
+  status TEXT NOT NULL,                 -- pending|queued|running|done|empty|failed|skipped
   umi_task_id TEXT,
   page_total INTEGER,
   page_done INTEGER,
@@ -318,10 +318,10 @@ job:  draft ──start──▶ queued ──▶ running ──┬──▶ don
                                             ├──▶ partial   部分成功、部分失败/无文字
                                             ├──▶ failed    全部失败
                                             └──▶ canceled  人工取消
-item: queued ──▶ running ──┬──▶ done    识别成功
-                           ├──▶ empty   无文字
-                           └──▶ failed  失败（含原因）
-      未开始的项在任务取消时置为 skipped
+item: pending ─提交─▶ queued ─▶ running ─┬─▶ done    识别成功
+                                         ├─▶ empty   无文字
+                                         └─▶ failed  失败（含原因）
+      pending（已上传未提交）与 queued 的项在任务取消时置为 skipped
 ```
 
 崩溃恢复：服务启动时把所有 `running` 的项重置为 `queued`，`attempts + 1`；对应 `job.status` 由 `running` 回到 `queued`。

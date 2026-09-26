@@ -14,10 +14,14 @@ from werkzeug.exceptions import HTTPException
 
 from . import security
 from .api import auth as auth_api
+from .api import items as items_api
+from .api import jobs as jobs_api
 from .api import system as system_api
 from .config import load_config
 from .db import Database
 from .logging_setup import setup_logging
+from .queue.manager import OcrQueue
+from .repositories import jobs as jobs_repo
 from .repositories import users as users_repo
 from .umi.manager import UmiManager
 
@@ -99,6 +103,9 @@ def create_app(config=None, base_dir=None):
 
     db = Database(config.db_path)
     db.init_schema()
+    recovered = jobs_repo.recover_running(db)
+    if recovered:
+        log.warning('启动恢复：%d 个中断的任务项已重新排队', recovered)
     bootstrap = users_repo.ensure_initial_admin(db, config.data_dir)
     if bootstrap:
         log.warning('已创建初始管理员：%s，初始密码已写入 %s',
@@ -115,12 +122,16 @@ def create_app(config=None, base_dir=None):
     app.config['SESSION_COOKIE_SECURE'] = False
     app.json.ensure_ascii = False
 
-    app.extensions['ocr'] = {
+    context = {
         'config': config,
         'db': db,
         'umi': umi,
         'limiter': security.LoginRateLimiter(),
+        'queue': None,
     }
+    # 队列对象需要引用上下文本身，所以先建字典再补进去
+    context['queue'] = OcrQueue(context)
+    app.extensions['ocr'] = context
 
     @app.before_request
     def _before_request():
@@ -166,6 +177,8 @@ def create_app(config=None, base_dir=None):
 
     app.register_blueprint(auth_api.bp)
     app.register_blueprint(system_api.bp)
+    app.register_blueprint(jobs_api.bp)
+    app.register_blueprint(items_api.bp)
 
     dist_dir = Path(config['frontend_dist_dir'])
 

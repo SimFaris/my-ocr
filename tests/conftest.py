@@ -79,3 +79,77 @@ def logged_in(client, admin):
     response = client.post('/api/auth/login', json=admin)
     assert response.status_code == 200, response.get_data(as_text=True)
     return client, response.get_json()['data']['csrf']
+
+class ApiClient(object):
+    """测试用接口客户端：自动带上会话 Cookie 与 CSRF 头。"""
+
+    def __init__(self, client, csrf):
+        self.client = client
+        self.csrf = csrf
+
+    def request(self, method, path, **kwargs):
+        headers = dict(kwargs.pop('headers', None) or {})
+        if method.upper() not in ('GET', 'HEAD', 'OPTIONS'):
+            headers['X-CSRF-Token'] = self.csrf
+        return self.client.open(path, method=method, headers=headers, **kwargs)
+
+    def get(self, path, **kwargs):
+        return self.request('GET', path, **kwargs)
+
+    def post(self, path, **kwargs):
+        return self.request('POST', path, **kwargs)
+
+    def put(self, path, **kwargs):
+        return self.request('PUT', path, **kwargs)
+
+    def delete(self, path, **kwargs):
+        return self.request('DELETE', path, **kwargs)
+
+
+@pytest.fixture
+def api_client(app):
+    """在同一个应用上以指定账号登录，返回带 CSRF 头的接口客户端。"""
+    def login(username, password):
+        client = app.test_client()
+        response = client.post('/api/auth/login', json={'username': username, 'password': password})
+        assert response.status_code == 200, response.get_data(as_text=True)
+        return ApiClient(client, response.get_json()['data']['csrf'])
+    return login
+
+
+@pytest.fixture
+def make_user(app):
+    """直接建用户，用于验证多用户隔离。"""
+    from backend.repositories import users as users_repo
+
+    def create(username, password='password123', role='user'):
+        users_repo.create(app.extensions['ocr']['db'], username, password,
+                          display_name=username, role=role)
+        return {'username': username, 'password': password}
+    return create
+
+
+def wait_until(predicate, timeout=20.0, interval=0.1):
+    """轮询等待条件成立，超时返回 False。"""
+    import time
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
+
+@pytest.fixture
+def login_on():
+    """在指定应用实例上新建账号并登录，返回带 CSRF 头的接口客户端。"""
+    def make(app, username='tester', password='password123', role='admin'):
+        from backend.repositories import users as users_repo
+
+        users_repo.create(app.extensions['ocr']['db'], username, password,
+                          display_name=username, role=role)
+        client = app.test_client()
+        response = client.post('/api/auth/login', json={'username': username, 'password': password})
+        assert response.status_code == 200, response.get_data(as_text=True)
+        return ApiClient(client, response.get_json()['data']['csrf'])
+    return make

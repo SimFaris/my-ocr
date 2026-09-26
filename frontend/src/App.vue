@@ -16,6 +16,11 @@ async function onLogout() {
   <div class="layout">
     <header v-if="user" class="topbar">
       <div class="brand">局域网离线 OCR</div>
+      <nav class="nav">
+        <router-link to="/workbench">工作台</router-link>
+        <router-link to="/jobs">任务列表</router-link>
+        <router-link to="/status">系统状态</router-link>
+      </nav>
       <div class="spacer"></div>
       <span class="who">
         {{ user.display_name || user.username }}（{{ user.role === 'admin' ? '管理员' : '普通用户' }}）

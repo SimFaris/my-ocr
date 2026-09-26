@@ -31,11 +31,14 @@ def status():
     manager = ctx['umi']
     manager.probe()
     snapshot = manager.snapshot()
+    queue_payload = jobs_repo.queue_summary(ctx['db'])
+    runtime = ctx.get('queue')
+    queue_payload['runtime'] = runtime.snapshot() if runtime is not None else None
     return ok({
         'app_version': __version__,
         'server_time': now_iso(),
         'umi': snapshot,
-        'queue': jobs_repo.queue_summary(ctx['db']),
+        'queue': queue_payload,
         'workers': config['ocr_workers'],
         'disk': disk_usage(config.data_dir),
         'data_dir': str(config.data_dir),
