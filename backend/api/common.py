@@ -29,10 +29,14 @@ def client_ip():
     return request.remote_addr or '-'
 
 
-def job_view(job, items=None):
-    """任务的可返回视图。"""
+def job_view(job, items=None, with_client=False):
+    """任务的可返回视图。
+
+    with_client 为真时附带来源 IP 与机器名（只给管理员看，普通用户不需要）。
+    """
     if job is None:
         return None
+    keys = job.keys()
     total = int(job['item_total'] or 0)
     done = int(job['item_done'] or 0)
     view = {
@@ -50,6 +54,12 @@ def job_view(job, items=None):
         'progress': 0.0 if total == 0 else round(done * 100.0 / total, 1),
         'ocr_options': jobs_repo.get_options(job),
     }
+    if 'username' in keys:
+        view['username'] = job['username']
+        view['user_display_name'] = job['user_display_name']
+    if with_client and 'client_ip' in keys:
+        view['client_ip'] = job['client_ip']
+        view['client_host'] = job['client_host']
     if items is not None:
         view['items'] = [item_view(item) for item in items]
     return view

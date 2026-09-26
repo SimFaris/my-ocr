@@ -2,11 +2,14 @@
 """SQLite 连接管理与建表。"""
 
 import contextlib
+import logging
 import sqlite3
 import threading
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+log = logging.getLogger(__name__)
+
+SCHEMA_VERSION = 2
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -32,7 +35,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     item_failed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     started_at TEXT,
-    finished_at TEXT
+    finished_at TEXT,
+    client_ip TEXT,
+    client_host TEXT
 );
 
 CREATE TABLE IF NOT EXISTS job_items (
@@ -82,6 +87,33 @@ CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
 """
+
+
+# 版本 2：给 jobs 增加来源 IP 与机器名
+MIGRATIONS = {
+    2: (('jobs', 'client_ip', 'TEXT'), ('jobs', 'client_host', 'TEXT')),
+}
+
+
+def _columns(conn, table):
+    return set(row[1] for row in conn.execute('PRAGMA table_info(%s)' % table))
+
+
+def _migrate(conn):
+    """按缺列补列，兼容老部署的数据文件（幂等，可重复执行）。"""
+    version = conn.execute('PRAGMA user_version').fetchone()[0]
+    applied = []
+    for target in sorted(MIGRATIONS):
+        if version >= target:
+            continue
+        for table, column, column_type in MIGRATIONS[target]:
+            if column not in _columns(conn, table):
+                conn.execute('ALTER TABLE %s ADD COLUMN %s %s' % (table, column, column_type))
+                log.info('数据库升级到 v%d：%s.%s 已添加', target, table, column)
+        conn.execute('PRAGMA user_version = %d' % target)
+        applied.append(target)
+        version = target
+    return applied
 
 
 class Database(object):
@@ -134,5 +166,6 @@ class Database(object):
     def init_schema(self):
         conn = self.connect()
         conn.executescript(SCHEMA_SQL)
+        _migrate(conn)
         conn.execute('PRAGMA user_version = %d' % SCHEMA_VERSION)
         return SCHEMA_VERSION

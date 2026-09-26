@@ -2,6 +2,7 @@
 """任务接口：创建、上传、提交、查询、取消、重试、删除与导出。"""
 
 import logging
+import threading
 import zipfile
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from ..services.storage import remove_job_files
 from ..services.ingest import (IMAGE_EXTENSIONS, PDF_EXTENSIONS, IngestError,
                                accept_upload)
 from ..utils import disk_usage
+from ..utils.network import resolve_in_background
 from .common import (client_ip, context, fail, item_view, job_view,
                      load_job_or_error, ok)
 
@@ -71,11 +73,17 @@ def create_job():
 
     title = str(payload.get('title') or '').strip() or '未命名任务'
     user = current_user()
-    job_id = jobs_repo.create(ctx['db'], user['id'], title, source_type, options)
+    ip = client_ip()
+    job_id = jobs_repo.create(ctx['db'], user['id'], title, source_type, options, client_ip=ip)
     audit.write(ctx['db'], 'job_created', user_id=user['id'], target=job_id,
-                detail={'title': title, 'source_type': source_type}, ip=client_ip())
+                detail={'title': title, 'source_type': source_type}, ip=ip)
+
+    # 机器名尽力解析：后台线程里做，解析到就回填，解析不到也不影响建任务
+    db = ctx['db']
+    resolve_in_background(ip, lambda host: jobs_repo.set_client_host(db, job_id, host))
+
     job = jobs_repo.get(ctx['db'], job_id)
-    return ok({'job': job_view(job),
+    return ok({'job': job_view(job, with_client=user['role'] == 'admin'),
                'image_extensions': list(IMAGE_EXTENSIONS),
                'pdf_extensions': list(PDF_EXTENSIONS),
                'accepts': list(SOURCE_KINDS[source_type])}, 201)
@@ -145,12 +153,15 @@ def list_jobs():
     keyword = (request.args.get('q') or '').strip() or None
     page = max(1, int(request.args.get('page') or 1))
     page_size = min(200, max(1, int(request.args.get('page_size') or 20)))
-    user_id = None if (scope == 'all' and user['role'] == 'admin') else user['id']
+    is_admin = user['role'] == 'admin'
+    show_all = is_admin and scope == 'all'
+    user_id = None if show_all else user['id']
 
     rows, total = jobs_repo.list_jobs(ctx['db'], user_id=user_id, status=status,
                                       page=page, page_size=page_size, keyword=keyword)
-    return ok({'items': [job_view(row) for row in rows], 'total': total,
-               'page': page, 'page_size': page_size})
+    return ok({'items': [job_view(row, with_client=is_admin) for row in rows],
+               'total': total, 'page': page, 'page_size': page_size,
+               'scope': 'all' if show_all else 'mine'})
 
 
 @bp.get('/jobs/summary')
@@ -174,7 +185,7 @@ def job_detail(job_id):
     job, error = load_job_or_error(job_id)
     if error:
         return error
-    return ok({'job': job_view(job)})
+    return ok({'job': job_view(job, with_client=current_user()['role'] == 'admin')})
 
 
 @bp.get('/jobs/<job_id>/items')

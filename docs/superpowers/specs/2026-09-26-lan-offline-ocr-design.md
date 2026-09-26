@@ -239,7 +239,9 @@ jobs(
   item_failed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   started_at TEXT,
-  finished_at TEXT
+  finished_at TEXT,
+  client_ip TEXT,                       -- 建任务时的客户端 IP（管理员可见）
+  client_host TEXT                      -- 尽力反查到的机器名，可能为空
 );
 
 job_items(

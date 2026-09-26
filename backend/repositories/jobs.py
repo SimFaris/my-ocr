@@ -11,23 +11,33 @@ JOB_STATUSES = ('draft', 'queued', 'running', 'done', 'partial', 'failed', 'canc
 ITEM_STATUSES = ('pending', 'queued', 'running', 'done', 'empty', 'failed', 'skipped')
 ACTIVE_STATUSES = ('queued', 'running')
 
-_FIELDS = ('id, user_id, title, source_type, status, ocr_options, '
-           'item_total, item_done, item_failed, created_at, started_at, finished_at')
+_FIELD_NAMES = ('id', 'user_id', 'title', 'source_type', 'status', 'ocr_options',
+                'item_total', 'item_done', 'item_failed', 'created_at', 'started_at',
+                'finished_at', 'client_ip', 'client_host')
+_FIELDS = ', '.join(_FIELD_NAMES)
+_FIELDS_JOINED = ', '.join('j.' + name for name in _FIELD_NAMES)
 
 
 def new_id():
     return uuid.uuid4().hex
 
 
-def create(db, user_id, title, source_type, ocr_options):
+def create(db, user_id, title, source_type, ocr_options, client_ip=None, client_host=None):
     job_id = new_id()
     with db.transaction() as conn:
         conn.execute(
-            'INSERT INTO jobs (id, user_id, title, source_type, status, ocr_options, created_at) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO jobs (id, user_id, title, source_type, status, ocr_options, '
+            'created_at, client_ip, client_host) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             (job_id, user_id, title, source_type, 'draft',
-             json.dumps(ocr_options or {}, ensure_ascii=False), now_iso()))
+             json.dumps(ocr_options or {}, ensure_ascii=False), now_iso(),
+             client_ip, client_host))
     return job_id
+
+
+def set_client_host(db, job_id, client_host):
+    """后台解析出机器名后回填。"""
+    with db.transaction() as conn:
+        conn.execute('UPDATE jobs SET client_host = ? WHERE id = ?', (client_host, job_id))
 
 
 def get(db, job_id):
@@ -62,9 +72,24 @@ def list_jobs(db, user_id=None, status=None, page=1, page_size=50, keyword=None)
     total = int(total_row['n']) if total_row else 0
     page = max(1, int(page))
     page_size = min(200, max(1, int(page_size)))
+    queries = []
+    rows_params = []
+    if user_id is not None:
+        queries.append('j.user_id = ?')
+        rows_params.append(user_id)
+    if status:
+        queries.append('j.status = ?')
+        rows_params.append(status)
+    if keyword:
+        queries.append('j.title LIKE ?')
+        rows_params.append('%' + keyword + '%')
+    join_clause = (' WHERE ' + ' AND '.join(queries)) if queries else ''
+
     rows = db.query(
-        'SELECT %s FROM jobs%s ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?'
-        % (_FIELDS, clause), tuple(params) + (page_size, (page - 1) * page_size))
+        'SELECT ' + _FIELDS_JOINED + ', u.username, u.display_name AS user_display_name '
+        'FROM jobs j LEFT JOIN users u ON u.id = j.user_id' + join_clause +
+        ' ORDER BY j.created_at DESC, j.rowid DESC LIMIT ? OFFSET ?',
+        tuple(rows_params) + (page_size, (page - 1) * page_size))
     return rows, total
 
 
