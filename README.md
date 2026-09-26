@@ -202,3 +202,11 @@ Windows 注册表把 `.js` 的 Content Type 登记成了 `text/plain`，Python �
 通常是上一个服务实例还在运行。注意 cheroot 默认开启 `SO_REUSEADDR`，在 Windows 上
 两个实例能绑同一端口、请求被旧实例接走，所以启动入口会主动检查并拒绝启动。
 处理办法：关掉旧窗口，或在任务管理器里结束残留的 `python.exe`。
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。
+
+识别引擎 [Umi-OCR](https://github.com/hiroi-sora/Umi-OCR) 是独立的 MIT 许可项目，
+本项目只通过其 HTTP 接口调用，不包含其代码。发布压缩包中自带的 Python 运行时
+（PSF 许可）与各依赖库，许可证信息保留在 `site-packages` 的 `*.dist-info` 目录中。
