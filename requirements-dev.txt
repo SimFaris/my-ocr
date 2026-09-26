@@ -1,0 +1,7 @@
+# 本地开发/测试用：不锁版本，适配本机较新的 Python（本机为 3.14）。
+# 正式部署请使用 requirements.txt。
+Flask
+cheroot
+requests
+pytest
+openpyxl

@@ -1,0 +1,20 @@
+# 目标环境（Windows 7 SP1 x64 + Python 3.8.10）锁定的依赖。
+# 全部为纯 Python 包，无 C 扩展编译需求，可离线安装：
+#   pip download -r requirements.txt -d vendor/wheels --python-version 3.8 --only-binary=:all:
+#   pip install --no-index --find-links vendor/wheels -r requirements.txt
+Flask==3.0.3
+Werkzeug==3.0.6
+Jinja2==3.1.4
+MarkupSafe==2.1.5
+itsdangerous==2.2.0
+click==8.1.7
+blinker==1.8.2
+cheroot==11.1.2
+jaraco.functools==4.1.0
+more-itertools==10.5.0
+requests==2.31.0
+urllib3==2.2.3
+certifi==2024.8.30
+idna==3.10
+charset-normalizer==3.3.2
+openpyxl==3.1.5

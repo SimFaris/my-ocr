@@ -1,0 +1,83 @@
+# -*- coding: utf-8 -*-
+"""系统状态、识别参数与根证书接口。"""
+
+import logging
+import threading
+import time
+
+from flask import Blueprint, send_file
+
+from .. import __version__
+from ..security import login_required
+from ..umi import UmiError
+from ..utils import disk_usage, now_iso
+from ..repositories import jobs as jobs_repo
+from .common import context, fail, ok
+
+log = logging.getLogger(__name__)
+
+bp = Blueprint('system', __name__, url_prefix='/api/system')
+
+CACHE_SECONDS = 300
+_options_cache = {'data': None, 'fetched_at': 0.0}
+_cache_lock = threading.Lock()
+
+
+@bp.get('/status')
+@login_required
+def status():
+    ctx = context()
+    config = ctx['config']
+    manager = ctx['umi']
+    manager.probe()
+    snapshot = manager.snapshot()
+    return ok({
+        'app_version': __version__,
+        'server_time': now_iso(),
+        'umi': snapshot,
+        'queue': jobs_repo.queue_summary(ctx['db']),
+        'workers': config['ocr_workers'],
+        'disk': disk_usage(config.data_dir),
+        'data_dir': str(config.data_dir),
+        'https': {
+            'enabled': bool(config['enable_https']),
+            'port': config['https_port'],
+            'cert_exists': config.cert_path('server.crt').is_file(),
+        },
+    })
+
+
+@bp.get('/ocr-options')
+@login_required
+def ocr_options():
+    """代理 Umi-OCR 的图片识别参数定义，缓存 5 分钟。"""
+    ctx = context()
+    manager = ctx['umi']
+    now = time.time()
+    with _cache_lock:
+        cached = _options_cache['data']
+        fetched_at = _options_cache['fetched_at']
+    if cached is not None and (now - fetched_at) < CACHE_SECONDS:
+        return ok(cached)
+
+    try:
+        data = manager.client.get_ocr_options()
+    except UmiError as exc:
+        if cached is not None:
+            log.warning('取识别参数失败，返回缓存：%s', exc)
+            return ok(cached)
+        return fail('umi_unavailable', '无法从 Umi-OCR 获取识别参数：%s' % exc, 503)
+
+    with _cache_lock:
+        _options_cache['data'] = data
+        _options_cache['fetched_at'] = now
+    return ok(data)
+
+
+@bp.get('/root-cert')
+def root_cert():
+    """下载自签根证书。这是唯一无需登录的接口，用于客户端导入信任。"""
+    path = context()['config'].cert_path('ca.cer')
+    if not path.is_file():
+        return fail('not_found', '根证书尚未生成，请先执行 tools/gen_cert.ps1', 404)
+    return send_file(str(path), as_attachment=True, download_name='my-ocr-root-ca.cer')

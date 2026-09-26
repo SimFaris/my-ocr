@@ -6,7 +6,7 @@
 | 状态 | 已确认（待评审） |
 | 目标平台 | Windows 7 SP1 x64（优先）/ Windows 10 x64 |
 | OCR 引擎 | Umi-OCR v2.1.5（外部进程，HTTP 接口调用） |
-| 后端 | Python 3.8.10 + Flask + waitress |
+| 后端 | Python 3.8.10 + Flask + cheroot |
 | 前端 | Vue 3 + Vite（构建目标 es2017），纯浏览器，无需安装 |
 
 ---
@@ -91,7 +91,7 @@
         │                                      │
         │  ┌────────────────────────────────┐  │
         │  │ OCR 服务 (Python 3.8.10)       │  │
-        │  │  Flask + waitress              │  │
+        │  │  Flask + cheroot              │  │
         │  │  认证 / REST API / 静态前端     │  │
         │  │  调度器 + 工作线程              │  │
         │  │  SQLite(WAL) + 文件存储         │  │
@@ -120,8 +120,8 @@
 | 决策 | 选择 | 备选 | 理由 |
 | --- | --- | --- | --- |
 | PDF 处理方式 | 整份交给 Umi-OCR `/api/doc` | 后端拆页后逐张调 `/api/ocr` | 备选需引入 PDF 渲染库（Win7 上最易失败的 C 扩展）；本方案能直接产出双层可搜索 PDF |
-| 进度推送 | 前端轮询（1s，仅活跃任务） | SSE 长连接 | waitress 为线程模型，长连接白占线程；轮询穿透代理更稳 |
-| 后端框架 | Flask 3.0 + waitress 2.1.2 | FastAPI + uvicorn | 纯 Python 无编译依赖，Win7 风险最低；瓶颈在 Umi-OCR，异步无收益 |
+| 进度推送 | 前端轮询（1s，仅活跃任务） | SSE 长连接 | cheroot 为线程模型，长连接白占线程；轮询穿透代理更稳 |
+| 后端框架 | Flask 3.0 + cheroot 11.1.2 | FastAPI + uvicorn、Flask + waitress | 三者均无编译依赖。waitress 官方明确不支持 TLS，而摄像头要求 HTTPS，选它必须再加一层反向代理（Win7 上又多一个组件）；cheroot 原生支持 TLS 且报告真实客户端 IP，直接满足需求 |
 | 图像处理位置 | 全部放浏览器 | 服务端生成缩略图 | 避免 Pillow 依赖；代价是 TIFF 等格式无法预览 |
 | Umi-OCR 部署方式 | 由后端托管并仅监听 127.0.0.1 | 独立部署并允许局域网访问 | 其并发能力差，暴露到局域网会被多用户直接打崩且无鉴权 |
 
@@ -141,7 +141,9 @@ MarkupSafe==2.1.5
 itsdangerous==2.2.0
 click==8.1.7
 blinker==1.8.2
-waitress==2.1.2
+cheroot==11.1.2
+jaraco.functools==4.1.0
+more-itertools==10.5.0
 requests==2.31.0
 urllib3==2.2.3
 certifi==2024.8.30
@@ -153,7 +155,7 @@ pytest==8.3.3        # 仅开发
 
 选型说明：
 
-- `waitress` 锁 2.1.2，因为 3.x 要求 Python ≥ 3.9。
+- WSGI 服务器选 cheroot 而非 waitress：waitress 官方文档明确写"不支持 TLS"，而摄像头必须走 HTTPS；cheroot 原生支持 TLS 并报告真实客户端 IP，省掉反向代理。cheroot 11.1.2 要求 Python ≥ 3.8；其依赖 `jaraco.functools` 锁 4.1.0（4.2 起要求 3.9+）、`more-itertools` 锁 10.5.0（11 起要求 3.10+）。
 - 不使用 SQLAlchemy，直接用标准库 `sqlite3`，减少版本耦合。
 - 不使用 Pillow / OpenCV / pypdfium2 / PyMuPDF 等任何含 C 扩展的库。
 - 密码哈希用标准库 `hashlib.scrypt`，不引入 bcrypt / argon2。
@@ -332,7 +334,7 @@ item: queued ──▶ running ──┬──▶ done    识别成功
 
 统一响应：成功 `{"ok": true, "data": ...}`；失败 `{"ok": false, "error": {"code": "...", "message": "..."}}`，并附合适的 HTTP 状态码。
 
-错误码：`auth_required` `forbidden` `not_found` `invalid_request` `payload_too_large` `unsupported_type` `disk_low` `umi_unavailable` `conflict` `rate_limited` `internal`。
+错误码：`auth_required` `forbidden` `not_found` `invalid_request` `payload_too_large` `unsupported_type` `disk_low` `umi_unavailable` `conflict` `rate_limited` `invalid_credentials` `internal`。
 
 认证（除登录外均需会话）：
 
@@ -444,7 +446,7 @@ item: queued ──▶ running ──┬──▶ done    识别成功
 | `umi_host` / `umi_port` | `127.0.0.1` / `1224` | Umi-OCR 服务地址 |
 | `umi_autostart` | `true` | 是否由后端启动 Umi-OCR |
 | `ocr_workers` | `1` | 工作线程数 |
-| `web_threads` | `8` | waitress 线程数 |
+| `web_threads` | `8` | cheroot 每个监听的工作线程数 |
 | `upload_max_mb` | `200` | 单文件上传上限 |
 | `retention_days` | `90` | 结果与原始文件保留天数，0 表示不自动清理 |
 | `disk_min_free_gb` | `5` | 低于该值拒绝新任务并告警 |

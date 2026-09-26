@@ -26,3 +26,9 @@ Thumbs.db
 # 临时
 .scratch/
 *.log
+
+# 测试临时目录（固定在项目内，避免系统临时目录权限问题）
+.pytest-tmp/
+
+# 冒烟测试临时目录
+.smoke/
