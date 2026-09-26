@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     打包"免安装运行时"：Python 3.8.10 嵌入式运行时 + 全部依赖。
 
@@ -15,7 +15,8 @@
 param(
     [string]$Version = '3.8.10',
     [string]$OutDir = 'vendor\runtime38',
-    [string]$WheelDir = 'vendor\wheels38'
+    [string]$WheelDir = 'vendor\wheels38',
+    [switch]$SkipTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,8 +58,10 @@ Expand-Archive -LiteralPath $zip -DestinationPath $OutDir -Force
 $tag = $majorMinor -replace '\.', ''
 $pth = Join-Path $OutDir ("python" + $tag + "._pth")
 if (Test-Path -LiteralPath $pth) {
-    @("python" + $tag + ".zip", '.', 'Lib\site-packages', 'import site') |
-        Set-Content -LiteralPath $pth -Encoding ascii
+    # 必须一行一项。这四项若被并成一行，Python 会把整行当成一个路径，
+    # 启动时直接报 "No module named 'encodings'"。
+    $pthLines = @("python$tag.zip", '.', 'Lib\site-packages', 'import site') -join "`r`n"
+    [System.IO.File]::WriteAllText($pth, $pthLines + "`r`n", (New-Object System.Text.ASCIIEncoding))
 }
 
 $site = Join-Path $OutDir 'Lib\site-packages'
@@ -66,7 +69,13 @@ New-Item -ItemType Directory -Force -Path $site | Out-Null
 New-Item -ItemType Directory -Force -Path $WheelDir | Out-Null
 
 Write-Host "下载 $majorMinor 版依赖轮子 ..." -ForegroundColor Cyan
-& $python -m pip download -r requirements.txt -d $WheelDir `
+$packages = @('-r', 'requirements.txt')
+if (-not $SkipTest) {
+    # 让目标机能自己跑 pytest 自检。后面三个是 pytest 在 3.8 下的条件依赖，
+    # pip 交叉下载时不会自动带上，必须显式列出（踩过这个坑）。
+    $packages += @('pytest', 'exceptiongroup', 'tomli', 'typing_extensions')
+}
+& $python -m pip download @packages -d $WheelDir `
     --python-version $majorMinor --implementation cp --abi $abi --platform win_amd64 `
     --only-binary=:all: --disable-pip-version-check
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -74,7 +83,22 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $count = 0
 foreach ($wheel in Get-ChildItem -LiteralPath $WheelDir -Filter *.whl) {
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($wheel.FullName, $site, $true)
+    # 逐个条目解包而不是调用 ExtractToDirectory(..., overwrite)：
+    # 带 overwrite 的那个重载只有 .NET Core 才有，PowerShell 5.1 跑在 .NET Framework 上会报错。
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($wheel.FullName)
+    try {
+        foreach ($entry in $archive.Entries) {
+            if (-not $entry.Name) { continue }        # 跳过目录项
+            $target = Join-Path $site $entry.FullName
+            $parent = Split-Path -Parent $target
+            if (-not (Test-Path -LiteralPath $parent)) {
+                New-Item -ItemType Directory -Force -Path $parent | Out-Null
+            }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
+        }
+    } finally {
+        $archive.Dispose()
+    }
     $count++
 }
 

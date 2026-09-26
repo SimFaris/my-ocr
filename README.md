@@ -100,6 +100,12 @@ start_server.bat --no-https --http-port 8088
 
 > 说明：`.bat` 文件用 **GBK(936)** 编码保存，这样中文在不切换代码页的中文 Windows
 > 控制台里能正常显示。编辑这些文件时请保持 GBK 编码与 CRLF 换行。
+## 文档索引
+
+- [项目交接说明（Handoff）](docs/HANDOFF.md)：进度、验证状态、踩过的坑、可选的下一步
+- [安装与使用说明](docs/install-and-usage.md)：一份完整的部署 + 使用文档（可直接交给对方）
+- [用户手册](docs/user-guide.md) / [根证书导入说明](docs/cert-guide.md)
+
 ## 部署到目标机
 
 - [Windows 7 部署](docs/deploy-win7.md)（含免安装运行时与官方 Python 两种方式、部署后自检清单）
@@ -112,6 +118,8 @@ start_server.bat --no-https --http-port 8088
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\build_runtime38.ps1     # 免安装运行时（推荐）
 powershell -ExecutionPolicy Bypass -File tools\build_offline_bundle.ps1  # 离线依赖包（配合官方 Python）
+powershell -ExecutionPolicy Bypass -File tools\build_release.ps1       # 生成可拷贝到其他机器的 zip 发布包
+powershell -ExecutionPolicy Bypass -File tools\build_release.ps1 -IncludeUmi  # 连 Umi-OCR 一起打包
 ```
 
 ## 使用流程
