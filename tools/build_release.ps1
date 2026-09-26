@@ -88,9 +88,11 @@ if ($IncludeUmi) {
     Copy-Tree (Join-Path $root 'vendor\umi-ocr') (Join-Path $stage 'vendor\umi-ocr')
 }
 
+# 包内文件名一律用 ASCII：Windows 下 tar/zip 写入中文名时不带 UTF-8 标志，
+# 换到 macOS/Linux 解压会变成乱码文件名。内容仍然是中文，不影响阅读。
 $guide = Join-Path $root 'docs\install-and-usage.md'
 if (Test-Path -LiteralPath $guide) {
-    Copy-Item -LiteralPath $guide -Destination (Join-Path $stage '安装与使用说明.md') -Force
+    Copy-Item -LiteralPath $guide -Destination (Join-Path $stage 'INSTALL-AND-USAGE.md') -Force
 }
 
 # 生成 config.json：尽量指向本机已解压的 Umi-OCR
@@ -150,4 +152,4 @@ $sizeMb = [math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 1)
 $fileCount = (Get-ChildItem -LiteralPath $stage -Recurse -File | Measure-Object).Count
 Write-Host "[完成] $zip" -ForegroundColor Green
 Write-Host "       体积 $sizeMb MB，$fileCount 个文件"
-Write-Host '       目标机解压后先看「安装与使用说明.md」或「从这里开始.txt」'
+Write-Host '       目标机解压后先看 START-HERE.txt 与 INSTALL-AND-USAGE.md（内容为中文）'
