@@ -96,9 +96,10 @@ class UmiManager(object):
             log_path.parent.mkdir(parents=True, exist_ok=True)
             self._log_handle = open(str(log_path), 'ab')
             creationflags = CREATE_NO_WINDOW if os.name == 'nt' else 0
+            command = [str(exe)] + [str(item) for item in (self.config['umi_start_args'] or [])]
             try:
                 self._process = subprocess.Popen(
-                    [str(exe)], cwd=str(exe.parent),
+                    command, cwd=str(exe.parent),
                     stdout=self._log_handle, stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL, creationflags=creationflags)
             except OSError as exc:

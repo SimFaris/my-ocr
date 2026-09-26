@@ -16,6 +16,7 @@ DEFAULTS = {
     'umi_host': '127.0.0.1',
     'umi_port': 1224,
     'umi_autostart': True,
+    'umi_start_args': ['--hide'],
     'umi_request_timeout': 300,
     'umi_retries': 3,
     'ocr_workers': 1,
