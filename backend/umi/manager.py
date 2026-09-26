@@ -37,6 +37,7 @@ class UmiManager(object):
         self._last_error = None
         self._last_check = None
         self._log_handle = None
+        self._started_by_us = False
         self._lock = threading.RLock()
         self._stop_event = threading.Event()
         self._thread = None
@@ -69,6 +70,7 @@ class UmiManager(object):
                 'online': bool(self._online),
                 'process_running': running,
                 'process_pid': process.pid if running else None,
+                'started_by_us': self._started_by_us,
                 'autostart': bool(self.config['umi_autostart']),
                 'exe_path': str(self.config.umi_exe),
                 'exe_exists': self.config.umi_exe.is_file(),
@@ -108,6 +110,7 @@ class UmiManager(object):
                 self._close_log_handle()
                 return False
             self._process_started_at = time.time()
+            self._started_by_us = True
             log.info('已启动 Umi-OCR：pid=%s，日志见 %s', self._process.pid, log_path)
             return True
 
@@ -127,7 +130,11 @@ class UmiManager(object):
             return False, None
         time.sleep(1.5)
         online, options = self.probe()
-        if not online:
+        if online:
+            # Umi-OCR 的启动器会派生真实主进程后自己退出，命令行参数不会传过去，
+            # 因此隐藏窗口要用它自带的命令接口在启动后再执行一次。
+            self._cli('--hide')
+        else:
             with self._lock:
                 self._restarts += 1
         return online, options
@@ -155,6 +162,14 @@ class UmiManager(object):
         if thread is not None:
             thread.join(timeout=5)
             self._thread = None
+        if self._started_by_us:
+            # --quit 通过 Umi-OCR 内部通道关闭真实进程，比终止启动器句柄可靠。
+            self._cli('--quit')
+            for _ in range(10):
+                if not self.probe()[0]:
+                    break
+                time.sleep(1)
+            self._started_by_us = False
         with self._lock:
             process = self._process
             if process is not None and process.poll() is None:
@@ -176,6 +191,23 @@ class UmiManager(object):
         started = self._process_started_at or 0
         if started and (time.time() - started) > 120:
             self._restarts = 0
+
+    def _cli(self, *args):
+        "调用 Umi-OCR 的命令行接口（隐藏窗口、关闭软件等），失败只记日志。"
+        exe = self.config.umi_exe
+        if not exe.is_file():
+            return False
+        command = [str(exe)] + [str(item) for item in args]
+        creationflags = CREATE_NO_WINDOW if os.name == 'nt' else 0
+        try:
+            result = subprocess.run(command, cwd=str(exe.parent), timeout=15,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   stdin=subprocess.DEVNULL, creationflags=creationflags)
+        except (OSError, subprocess.SubprocessError) as exc:
+            log.warning('执行 Umi-OCR 命令 %s 失败：%s', args, exc)
+            return False
+        log.info('已执行 Umi-OCR 命令 %s（退出码 %s）', list(args), result.returncode)
+        return True
 
     def _close_log_handle(self):
         if self._log_handle is not None:

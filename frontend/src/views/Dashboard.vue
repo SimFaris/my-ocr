@@ -82,8 +82,10 @@ onUnmounted(() => {
             {{ umi.exe_exists ? '已找到' : '未找到' }}
           </span>
         </span>
-        <span class="key">托管进程</span>
-        <span>{{ umi.process_running ? ('运行中，PID ' + umi.process_pid) : '未由本服务启动' }}</span>
+        <span class="key">启动来源</span>
+        <span>
+          {{ umi.started_by_us ? '由本服务托管启动' : (umi.online ? '已在运行（非本服务启动）' : '未启动') }}
+        </span>
         <span class="key">自动重启次数</span>
         <span>{{ umi.restarts }} / {{ umi.max_restarts }}</span>
         <span class="key">最近检查</span>
