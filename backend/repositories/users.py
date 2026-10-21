@@ -51,6 +51,28 @@ def set_active(db, user_id, active):
                      (1 if active else 0, user_id))
 
 
+def rename(db, user_id, new_username):
+    """修改用户名（任务与审计通过 user_id 关联，不受影响）。"""
+    with db.transaction() as conn:
+        conn.execute('UPDATE users SET username = ? WHERE id = ?', (new_username, user_id))
+
+
+def write_initial_password_file(data_dir, username, password):
+    """写初始凭据文件；登录页会据此显示提示，改密后自动删除。"""
+    marker = Path(data_dir) / 'initial_admin_password.txt'
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        '初始管理员账号（首次启动自动生成）',
+        '用户名：%s' % username,
+        '密码：%s' % password,
+        '',
+        '请登录后立即修改密码，修改成功后本文件会被自动删除。',
+    ]
+    with open(str(marker), 'w', encoding='utf-8') as handle:
+        handle.write('\n'.join(lines) + '\n')
+    return marker
+
+
 def set_display_name(db, user_id, display_name):
     with db.transaction() as conn:
         conn.execute('UPDATE users SET display_name = ? WHERE id = ?', (display_name, user_id))
@@ -101,15 +123,5 @@ def ensure_initial_admin(db, data_dir, username='cm', password=None):
         return None
     password = password or security.generate_password()
     create(db, username, password, display_name='系统管理员', role='admin')
-    marker = Path(data_dir) / 'initial_admin_password.txt'
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    lines = [
-        '初始管理员账号（首次启动自动生成）',
-        '用户名：%s' % username,
-        '密码：%s' % password,
-        '',
-        '请登录后立即修改密码，修改成功后本文件会被自动删除。',
-    ]
-    with open(str(marker), 'w', encoding='utf-8') as handle:
-        handle.write('\n'.join(lines) + '\n')
+    write_initial_password_file(data_dir, username, password)
     return username, password

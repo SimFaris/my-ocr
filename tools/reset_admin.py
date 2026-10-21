@@ -42,6 +42,11 @@ def build_parser():
     parser.add_argument('--username', help='要重置的用户名')
     parser.add_argument('--password', help='指定新密码；不填则随机生成')
     parser.add_argument('--list', action='store_true', help='列出所有用户')
+    parser.add_argument('--rename-to', help='把该用户改成新的用户名')
+    parser.add_argument('--recreate-hint', action='store_true',
+                        help='重建初始凭据文件（登录页会重新显示账号密码）')
+    parser.add_argument('--allow-short', action='store_true',
+                        help='允许把密码设置为 8 位以下（仅用于初始/演示口令，登录后应尽快改成长密码）')
     parser.add_argument('--base-dir', help='项目根目录，默认自动探测')
     parser.add_argument('--data-dir', help='数据目录，默认读取配置')
     return parser
@@ -78,13 +83,33 @@ def main(argv=None):
         print('[错误] 用户不存在：%s' % args.username)
         return 1
 
+    if args.rename_to:
+        new_name = args.rename_to.strip()
+        existing = users_repo.get_by_username(db, new_name)
+        if existing is not None and existing['id'] != user['id']:
+            print('[错误] 用户名已存在：%s' % new_name)
+            return 1
+        if not new_name or len(new_name) > 32:
+            print('[错误] 新用户名不合法')
+            return 1
+        old_name = user['username']
+        users_repo.rename(db, user['id'], new_name)
+        user = users_repo.get(db, user['id'])
+        audit.write(db, 'username_renamed', user_id=None, target=old_name,
+                    detail={'new': new_name, 'by': 'tools/reset_admin.py'})
+        print('用户名已从 %s 改为 %s' % (old_name, new_name))
+
     password = args.password or security.generate_password()
-    if len(password) < 8:
-        print('[错误] 密码至少 8 位')
+    if len(password) < 8 and not args.allow_short:
+        print('[错误] 密码至少 8 位；如确实需要更短（例如初始口令 cm），加 --allow-short')
         return 1
 
     users_repo.set_password(db, user['id'], password)
+    # 默认删除初始凭据提示；--recreate-hint 时改为重新生成（登录页会显示）
     users_repo.drop_initial_password_file(config.data_dir)
+    if args.recreate_hint:
+        users_repo.write_initial_password_file(config.data_dir, user['username'], password)
+        print('已重建初始凭据提示文件：登录页会显示这组账号密码')
     audit.write(db, 'password_reset_by_cli', user_id=None, target=user['username'],
                 detail={'by': 'tools/reset_admin.py'})
     print('已重置用户 %s 的密码：%s' % (user['username'], password))
