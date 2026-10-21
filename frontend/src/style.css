@@ -176,3 +176,15 @@ label.checkbox input { margin: 0; }
 .btn-mini.warn:hover { background: #fffbeb; border-color: #fcd34d; }
 .btn-mini.danger { color: #b91c1c; border-color: #fecaca; }
 .btn-mini.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+
+/* 首次部署时的初始凭据提示 */
+.bootstrap-hint {
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.bootstrap-hint strong { color: #92400e; font-size: 13px; }
+.bootstrap-hint p { margin: 6px 0; font-size: 13px; }
+.bootstrap-hint code { background: #fef3c7; padding: 1px 6px; border-radius: 4px; }

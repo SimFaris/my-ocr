@@ -112,10 +112,16 @@ def create_app(config=None, base_dir=None):
     recovered = jobs_repo.recover_running(db)
     if recovered:
         log.warning('启动恢复：%d 个中断的任务项已重新排队', recovered)
-    bootstrap = users_repo.ensure_initial_admin(db, config.data_dir)
+    bootstrap = users_repo.ensure_initial_admin(
+        db, config.data_dir,
+        username=str(config['initial_admin_username'] or 'cm'),
+        password=str(config['initial_admin_password'] or '') or None)
     if bootstrap:
         log.warning('已创建初始管理员：%s，初始密码已写入 %s',
                     bootstrap[0], config.data_dir / 'initial_admin_password.txt')
+        if config['initial_admin_password']:
+            log.warning('当前使用的是配置中的初始密码（%s），请登录后立即修改！',
+                        config['initial_admin_username'])
 
     umi = UmiManager(config)
 

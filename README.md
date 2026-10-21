@@ -167,6 +167,21 @@ powershell -ExecutionPolicy Bypass -File tools\build_release.ps1 -IncludeUmi  # 
   两者的行为差异会在 M2 开始时用 Python 3.8 环境做一次回归验证。
 - 前端在部署包中直接使用构建好的 `frontend/dist`，目标机不需要安装 Node。
 
+## 初始登录凭据
+
+全新部署时默认管理员为 **`cm` / `cm`**（可在 `config.json` 用
+`initial_admin_username` / `initial_admin_password` 修改）。
+
+- 首次启动会把凭据写入 `data/initial_admin_password.txt`，**登录页会直接显示这组凭据**，
+  并有一个「填入登录框」按钮，省去手输；
+- 该提示**只在初始密码文件存在时出现**：管理员一旦修改密码，文件被删除、提示立即消失，
+  不会留下任何凭据痕迹；
+- 登录后请立刻修改密码——`cm/cm` 只是安装引导用的临时口令，管理员改密时要求至少 8 位；
+- 如果不想在登录页显示凭据，把 `config.json` 里的 `show_initial_credentials` 设为 `false`。
+
+> 安全提示：登录页提示是**公开接口**，在管理员首次改密之前，同一网段能打开登录页的人
+> 都能看到这组凭据。请只在受控网络中启用，并尽快完成首次改密。
+
 ## 管理员能力
 
 - 任务列表左上角可切换「全部用户的任务 / 只看我的任务」；切到全部时会显示每条任务的

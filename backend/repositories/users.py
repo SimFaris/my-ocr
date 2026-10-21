@@ -91,11 +91,15 @@ def drop_initial_password_file(data_dir):
         log.warning('删除初始密码文件失败：%s', exc)
 
 
-def ensure_initial_admin(db, data_dir, username='admin'):
-    """首次启动时创建管理员，返回 (用户名, 明文密码)；已有用户则返回 None。"""
+def ensure_initial_admin(db, data_dir, username='cm', password=None):
+    """首次启动时创建管理员，返回 (用户名, 明文密码)；已有用户则返回 None。
+
+    password 为空时才随机生成；显式传入时按原样使用（允许像 "cm" 这种
+    短口令作为初始化凭据，登录后应由管理员立即改成长密码）。
+    """
     if count(db) > 0:
         return None
-    password = security.generate_password()
+    password = password or security.generate_password()
     create(db, username, password, display_name='系统管理员', role='admin')
     marker = Path(data_dir) / 'initial_admin_password.txt'
     marker.parent.mkdir(parents=True, exist_ok=True)

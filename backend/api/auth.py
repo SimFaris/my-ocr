@@ -2,6 +2,7 @@
 """认证接口：登录、注销、当前用户、改密码。"""
 
 import logging
+from pathlib import Path
 
 from flask import Blueprint, request, session
 
@@ -46,6 +47,39 @@ def login():
     users_repo.touch_login(db, user['id'])
     audit.write(db, 'login', user_id=user['id'], ip=ip)
     return ok({'user': users_repo.public_view(user), 'csrf': session['csrf']})
+
+
+@bp.get('/bootstrap-hint')
+def bootstrap_hint():
+    """返回初始登录凭据，供登录页展示。
+
+    只在两个条件下返回：配置开启 show_initial_credentials，且初始密码文件仍存在
+    （管理员改密后该文件会被删除，提示随之消失）。这是**公开接口**：同一网段内
+    能打开登录页的人都能看到凭据，仅用于首次部署引导。
+    """
+    ctx = context()
+    config = ctx['config']
+    if not config['show_initial_credentials']:
+        return ok({'visible': False})
+
+    marker = Path(config.data_dir) / 'initial_admin_password.txt'
+    if not marker.is_file():
+        return ok({'visible': False})
+    try:
+        text = marker.read_text(encoding='utf-8')
+    except OSError:
+        return ok({'visible': False})
+
+    username = ''
+    password = ''
+    for line in text.splitlines():
+        if line.startswith('用户名：'):
+            username = line.split('：', 1)[1].strip()
+        elif line.startswith('密码：'):
+            password = line.split('：', 1)[1].strip()
+    if not username or not password:
+        return ok({'visible': False})
+    return ok({'visible': True, 'username': username, 'password': password})
 
 
 @bp.post('/logout')

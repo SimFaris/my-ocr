@@ -29,7 +29,7 @@ def test_admin_sees_all_jobs_with_scope(api_client, admin, make_user):
     everything = admin_api.get('/api/jobs?scope=all').get_json()['data']
     assert everything['total'] == 2
     assert everything['scope'] == 'all'
-    assert sorted(item['username'] for item in everything['items']) == [admin['username'], 'bob']
+    assert sorted(item['username'] for item in everything['items']) == sorted([admin['username'], 'bob'])
 
     # 管理员可以直接打开别人的任务详情
     assert admin_api.get('/api/jobs/%s' % bob_job['id']).status_code == 200

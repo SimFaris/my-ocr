@@ -30,6 +30,9 @@ DEFAULTS = {
     'pdf_item_timeout_per_page': 20,
     'pdf_item_timeout_max': 7200,
     'pdf_stall_seconds': 600,
+    'initial_admin_username': 'cm',
+    'initial_admin_password': 'cm',
+    'show_initial_credentials': True,
     'log_level': 'INFO',
     'session_secret_file': '',
 }
