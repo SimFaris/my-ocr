@@ -85,12 +85,24 @@ Write-Host "gh：$gh" -ForegroundColor Cyan
 if (-not $NoProxy) {
     if (-not $Proxy) { $Proxy = Get-SystemProxy }
     if ($Proxy) {
-        Write-Host "检测到系统代理，git 与 gh 都走它：$Proxy" -ForegroundColor Cyan
-        $env:HTTP_PROXY = $Proxy
-        $env:HTTPS_PROXY = $Proxy
-        & git config --global "http.https://github.com/.proxy" $Proxy
-        & git config --global "https.https://github.com/.proxy" $Proxy
-    } else {
+        # 代理可能已经被关掉：先探一下端口。不通就不要把 git 配到死代理上，
+        # 否则 git 会一直报 "Failed to connect ... via 127.0.0.1"。
+        $proxyUri = [System.Uri]$Proxy
+        if (Test-Tcp $proxyUri.Host $proxyUri.Port) {
+            Write-Host "检测到系统代理，git 与 gh 都走它：$Proxy" -ForegroundColor Cyan
+            $env:HTTP_PROXY = $Proxy
+            $env:HTTPS_PROXY = $Proxy
+            & git config --global "http.https://github.com/.proxy" $Proxy
+            & git config --global "https.https://github.com/.proxy" $Proxy
+        } else {
+            Write-Host "系统代理 $Proxy 当前不可用，本次直接连接" -ForegroundColor Yellow
+            Remove-Item Env:HTTP_PROXY,Env:HTTPS_PROXY -ErrorAction SilentlyContinue
+            & git config --global --unset "http.https://github.com/.proxy" *> $null
+            & git config --global --unset "https.https://github.com/.proxy" *> $null
+            $Proxy = ''
+        }
+    }
+    if (-not $Proxy) {
         Write-Host '未检测到系统代理（若 git push 超时，可用 -Proxy 手动指定）' -ForegroundColor Yellow
     }
 }
